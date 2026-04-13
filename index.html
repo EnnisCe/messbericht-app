@@ -1,0 +1,3111 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Messbericht V4</title>
+  <script src="https://unpkg.com/konva@9/konva.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #111827; font-family: system-ui, -apple-system, sans-serif; color: #f9fafb; overflow: hidden; }
+    #app { display: flex; flex-direction: column; height: 100%; }
+
+    /* ── Header ── */
+    #header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 12px; background: #1f2937;
+      border-bottom: 1px solid #374151; flex-shrink: 0; min-height: 52px;
+    }
+    #step-title { flex: 1; text-align: center; font-size: 14px; font-weight: 600; color: #e5e7eb; }
+    #btn-projekt {
+      width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid #374151;
+      background: #111827; color: #6b7280; font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* ── Feste Navigationsleiste unten ── */
+    #nav-bar {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: #1f2937; border-top: 1px solid #374151;
+      display: none; flex-direction: column;
+      z-index: 40;
+    }
+    #nav-bar.visible { display: flex; }
+    /* ── Step-Navigation im Nav-Bar ── */
+    #step-nav {
+      display: flex; align-items: flex-end; padding: 8px 16px 5px;
+      border-bottom: 1px solid #2d3748;
+    }
+    #step-nav.hidden { display: none; }
+    .sn-item {
+      display: flex; flex-direction: column; align-items: center;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+    }
+    .sn-label {
+      font-size: 9px; color: #4b5563; text-transform: lowercase;
+      letter-spacing: .2px; margin-bottom: 5px; white-space: nowrap;
+    }
+    .sn-dot {
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 1.5px solid #374151; background: #111827;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 700; color: #4b5563;
+      transition: all .2s;
+    }
+    .sn-line {
+      flex: 1; height: 1.5px; background: #374151; margin-bottom: 11px;
+    }
+    .sn-item.active .sn-label { color: #93c5fd; }
+    .sn-item.active .sn-dot { border-color: #3b82f6; color: #93c5fd; background: #1e3a5f; }
+    .sn-item.done .sn-label { color: #6ee7b7; }
+    .sn-item.done .sn-dot { border-color: #10b981; color: #6ee7b7; background: #064e3b; }
+    /* ── Nav-Buttons ── */
+    #nav-btns {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 14px; padding-bottom: calc(8px + env(safe-area-inset-bottom));
+      gap: 10px;
+    }
+    .nav-btn {
+      padding: 10px 18px; border-radius: 10px; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+      -webkit-tap-highlight-color: transparent; font-family: inherit;
+    }
+    .nav-btn.back   { background: #374151; color: #9ca3af; }
+    .nav-btn.next   { background: #3b82f6; color: #fff; }
+    .nav-btn.finish { background: #10b981; color: #fff; }
+    .nav-btn:disabled { opacity: .35; pointer-events: none; }
+
+    /* ── Topbar ── */
+    #topbar {
+      flex-shrink: 0; background: #1f2937; border-bottom: 1px solid #374151;
+      padding: 8px 10px; overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    /* ── Tool buttons ── */
+    .tool-row {
+      display: flex; gap: 6px; justify-content: flex-start; flex-wrap: nowrap;
+      min-height: 56px; align-items: center; width: max-content; min-width: 100%;
+    }
+    .tool-btn {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; padding: 7px 10px; border-radius: 10px; min-width: 56px; min-height: 56px;
+      border: 1.5px solid #374151; background: #111827; color: #6b7280;
+      font-size: 11px; cursor: pointer; transition: all .15s; user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tool-btn .icon { font-size: 20px; line-height: 1.1; }
+    .tool-btn.active     { border-color: #93c5fd; color: #fff; background: #2563eb; }
+    .tool-btn.active.del { border-color: #fca5a5; color: #fff; background: #dc2626; }
+    .tool-btn.accent     { border-color: #10b981; color: #6ee7b7; background: #064e3b; }
+    .tool-btn.dim        { opacity: .35; pointer-events: none; }
+
+    /* ── Messaufnahme Tabs (Schritt 4) ── */
+    .ma-tabs {
+      display: flex; gap: 6px; align-items: center;
+      width: max-content; min-width: 100%; min-height: 48px;
+    }
+    .ma-tab {
+      padding: 8px 14px; border-radius: 8px; font-size: 12px; font-weight: 600;
+      white-space: nowrap; border: 1.5px solid #374151; background: #111827;
+      color: #6b7280; cursor: pointer; transition: all .15s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .ma-tab.active   { background: #2563eb; color: #fff; border-color: #93c5fd; }
+    .ma-tab.optional { border-style: dashed; }
+    .ma-tab.has-data { border-color: #10b981; color: #10b981; }
+    .ma-tab.active.has-data { background: #2563eb; color: #fff; border-color: #93c5fd; }
+
+    /* ── Canvas ── */
+    #canvas-wrap { flex: 1; position: relative; overflow: hidden; touch-action: none; }
+    #canvas-container { width: 100%; height: 100%; }
+
+    /* ── Hint ── */
+    #hint {
+      position: absolute; top: 8px; left: 50%; transform: translateX(-50%);
+      background: rgba(31,41,55,.93); color: #9ca3af; padding: 5px 14px;
+      border-radius: 20px; font-size: 12px; pointer-events: none;
+      white-space: nowrap; z-index: 10; max-width: 86vw;
+      overflow: hidden; text-overflow: ellipsis;
+    }
+
+    /* ── Confirm overlay ── */
+    #confirm-overlay {
+      display: none; position: absolute; top: 12px; right: 12px;
+      z-index: 20; flex-direction: column; gap: 8px;
+    }
+    #confirm-overlay.show { display: flex; }
+    #confirm-btn {
+      width: 52px; height: 52px; border-radius: 50%; border: none;
+      background: #10b981; color: #fff; font-size: 24px; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,.45);
+    }
+    #cancel-btn {
+      width: 52px; height: 52px; border-radius: 50%; border: none;
+      background: #374151; color: #9ca3af; font-size: 20px; cursor: pointer;
+      box-shadow: 0 2px 8px rgba(0,0,0,.3);
+    }
+
+    /* ── Modals ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.65);
+      display: none; align-items: flex-end; justify-content: center;
+      z-index: 100; padding-bottom: env(safe-area-inset-bottom);
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: #1f2937; border-radius: 16px 16px 0 0; padding: 20px;
+      width: 100%; max-width: 480px;
+    }
+    .modal h3 { font-size: 16px; margin-bottom: 14px; color: #e5e7eb; }
+    .modal p  { font-size: 13px; color: #6b7280; margin-bottom: 10px; }
+    .modal label {
+      display: block; font-size: 12px; color: #9ca3af;
+      margin-bottom: 4px; font-weight: 500;
+    }
+    .modal input[type=text], .modal input[type=number] {
+      width: 100%; padding: 12px; border-radius: 10px;
+      border: 1.5px solid #374151; background: #111827;
+      color: #f9fafb; font-size: 16px; margin-bottom: 12px; outline: none;
+    }
+    .modal input:focus { border-color: #3b82f6; }
+    .modal-btns { display: flex; gap: 8px; margin-top: 4px; }
+    .modal-btns button {
+      flex: 1; padding: 12px; border-radius: 10px; border: none;
+      font-size: 15px; font-weight: 600; cursor: pointer;
+    }
+    .modal-btns .ok     { background: #3b82f6; color: #fff; }
+    .modal-btns .cancel { background: #374151; color: #9ca3af; }
+    /* Verfahren toggle */
+    .toggle-row { display: flex; gap: 8px; margin-bottom: 12px; }
+    .toggle-btn {
+      flex: 1; padding: 12px; border-radius: 10px; border: 2px solid #374151;
+      background: #111827; color: #6b7280; font-size: 16px; font-weight: 700;
+      cursor: pointer; transition: all .15s; text-align: center;
+    }
+    .toggle-btn.active { border-color: #3b82f6; background: #1e3a5f; color: #93c5fd; }
+    /* Mess-Eingabe nebeneinander */
+    .mess-row { display: flex; gap: 10px; }
+    .mess-row > div { flex: 1; }
+    /* Door variant grid */
+    #variant-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,.85); color: #fff; padding: 8px 18px;
+      border-radius: 20px; font-size: 13px; pointer-events: none;
+      opacity: 0; transition: opacity .25s; z-index: 200; white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
+
+    /* ── Dashboard ── */
+    #dashboard {
+      display: flex; flex-direction: column; height: 100%;
+      background: #111827;
+    }
+    .db-header {
+      height: 52px; background: #1f2937; color: #f9fafb;
+      display: flex; align-items: center; padding: 0 12px;
+      flex-shrink: 0; border-bottom: 1px solid #374151;
+    }
+    .db-header h1 { flex: 1; font-size: 17px; font-weight: 600; text-align: center; }
+    .btn-db-icon {
+      background: none; border: none; color: #9ca3af; font-size: 20px;
+      cursor: pointer; padding: 6px 8px; min-width: 40px; line-height: 1;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #db-list-wrap {
+      flex: 1; overflow-y: auto; padding: 14px 14px 120px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .db-job-list { display: flex; flex-direction: column; gap: 10px; }
+    .db-card {
+      background: #1f2937; border-radius: 10px; padding: 14px 16px;
+      border-left: 4px solid #3b82f6;
+      display: flex; align-items: center; gap: 10px;
+      cursor: pointer; -webkit-tap-highlight-color: transparent;
+      transition: opacity .15s;
+    }
+    .db-card.draft { border-left-color: #f59e0b; }
+    .db-card.saved { border-left-color: #10b981; }
+    .db-status-hint {
+      font-size: 11px; font-weight: 600; margin-top: 5px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .db-status-hint.draft { color: #f59e0b; }
+    .db-status-hint.saved { color: #10b981; }
+    .db-card:active { opacity: .75; }
+    .db-card-info { flex: 1; min-width: 0; }
+    .db-card-title {
+      font-weight: 600; font-size: 15px; color: #f9fafb;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .db-card-meta { font-size: 12px; color: #6b7280; margin-top: 3px; }
+    .db-badge {
+      font-size: 11px; font-weight: 600; padding: 3px 8px;
+      border-radius: 20px; white-space: nowrap; flex-shrink: 0;
+    }
+    .db-badge-offen  { background: #1e3a5f; color: #93c5fd; }
+    .db-badge-aktiv  { background: #064e3b; color: #6ee7b7; }
+    .db-badge-fertig { background: #374151; color: #6b7280; }
+    .db-ma-list {
+      display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px;
+    }
+    .db-ma-chip {
+      font-size: 10px; font-weight: 600; padding: 2px 7px;
+      border-radius: 20px; background: #064e3b; color: #6ee7b7;
+      border: 1px solid #10b981; white-space: nowrap; line-height: 1.6;
+    }
+    .db-ma-chip span { font-weight: 400; color: #9ca3af; margin-left: 3px; }
+    .db-del {
+      background: none; border: none; font-size: 18px; cursor: pointer;
+      opacity: .4; padding: 6px 4px; flex-shrink: 0; color: #f9fafb;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .db-del:active { opacity: 1; color: #ef4444; }
+    #db-empty {
+      text-align: center; color: #6b7280; padding: 64px 24px; line-height: 1.8;
+      display: none;
+    }
+    .db-empty-icon { font-size: 48px; display: block; margin-bottom: 12px; }
+    #fab-new {
+      position: fixed; bottom: 24px; right: 20px;
+      background: #3b82f6; color: #fff;
+      border: none; border-radius: 28px;
+      padding: 14px 22px; font-size: 15px; font-weight: 700;
+      box-shadow: 0 4px 16px rgba(59,130,246,.45);
+      cursor: pointer; z-index: 20; display: none;
+      align-items: center; gap: 8px;
+      font-family: inherit; -webkit-tap-highlight-color: transparent;
+    }
+    #fab-new.visible { display: flex; }
+    /* ── MA Overlay ── */
+    #ma-overlay {
+      display: none; position: fixed; inset: 0; z-index: 200;
+      background: #111827; flex-direction: column;
+    }
+    #ma-overlay.show { display: flex; }
+    #ma-ov-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; background: #1f2937;
+      border-bottom: 1px solid #374151; flex-shrink: 0;
+    }
+    #ma-ov-title { flex: 1; font-size: 15px; font-weight: 700; color: #e5e7eb; }
+    #ma-ov-close {
+      background: none; border: none; color: #6b7280; font-size: 20px;
+      cursor: pointer; padding: 4px 6px; -webkit-tap-highlight-color: transparent;
+    }
+    #ma-ov-body {
+      flex: 1; overflow-y: auto; padding: 18px 16px 24px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .ma-section-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: #6b7280; margin-bottom: 12px;
+    }
+    .ma-field { margin-bottom: 14px; }
+    .ma-field label {
+      display: block; font-size: 11px; font-weight: 600;
+      color: #9ca3af; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .3px;
+    }
+    .ma-field input, .ma-field select {
+      width: 100%; padding: 10px 12px; border: 1.5px solid #374151;
+      border-radius: 10px; background: #1f2937; color: #f9fafb;
+      font-size: 15px; outline: none; font-family: inherit;
+      -webkit-appearance: none; appearance: none;
+    }
+    .ma-field input[type="date"] { color-scheme: dark; }
+    .ma-field select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center; background-color: #1f2937;
+    }
+    .ma-field input:focus, .ma-field select:focus { border-color: #3b82f6; }
+    /* Pin-Karte in Overlay */
+    .ma-pin-card {
+      background: #1f2937; border-radius: 12px; padding: 16px;
+      margin-bottom: 16px; border: 1.5px solid #374151;
+    }
+    .ma-pin-nr {
+      font-size: 11px; font-weight: 700; color: #6b7280;
+      text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px;
+    }
+    .ma-pin-label { font-size: 22px; font-weight: 800; color: #f9fafb; margin-bottom: 2px; }
+    .ma-pin-meta  { font-size: 12px; color: #6b7280; margin-bottom: 2px; }
+    .ma-pin-bereich { font-size: 13px; color: #9ca3af; }
+    .ma-digits-row {
+      display: flex; align-items: center; gap: 10px; margin-top: 14px;
+    }
+    .ma-digits-input {
+      flex: 1; padding: 14px 14px; border: 2px solid #374151;
+      border-radius: 10px; background: #111827; color: #f9fafb;
+      font-size: 28px; font-weight: 700; text-align: center;
+      outline: none; font-family: inherit;
+    }
+    .ma-digits-input:focus { border-color: #3b82f6; }
+    .ma-digits-unit {
+      font-size: 18px; color: #6b7280; font-weight: 600; flex-shrink: 0;
+    }
+    /* Progress */
+    .ma-progress {
+      display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .ma-prog-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #374151; flex-shrink: 0; transition: background .2s;
+    }
+    .ma-prog-dot.current { background: #3b82f6; }
+    .ma-prog-dot.filled  { background: #10b981; }
+    /* ── Bereiche Raumklima Screen ── */
+    .ma-bereich-card {
+      background: #1f2937; border: 1.5px solid #374151; border-radius: 12px;
+      padding: 14px 16px; margin-bottom: 10px;
+    }
+    .ma-bereich-card-title {
+      font-size: 13px; font-weight: 700; color: #e5e7eb; margin-bottom: 12px;
+    }
+    .ma-klima-row {
+      display: flex; gap: 10px;
+    }
+    .ma-klima-field {
+      flex: 1; display: flex; flex-direction: column; gap: 4px;
+    }
+    .ma-klima-field label {
+      font-size: 10px; font-weight: 600; color: #6b7280;
+      text-transform: uppercase; letter-spacing: .3px;
+    }
+    .ma-klima-input-wrap {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .ma-klima-input {
+      flex: 1; padding: 9px 10px; border-radius: 8px;
+      border: 1.5px solid #374151; background: #111827;
+      color: #f9fafb; font-size: 15px; font-weight: 600;
+      outline: none; font-family: inherit; text-align: center;
+    }
+    .ma-klima-input:focus { border-color: #3b82f6; }
+    .ma-klima-unit { font-size: 12px; color: #6b7280; font-weight: 600; flex-shrink: 0; }
+    /* Klima-Anzeige im Pin-Card */
+    .ma-pin-klima {
+      font-size: 12px; color: #6b7280; margin-bottom: 2px;
+    }
+    /* ── Trocknung Screen ── */
+    .tr-card {
+      display: flex; align-items: flex-start; gap: 12px;
+      background: #1f2937; border: 1.5px solid #374151; border-radius: 12px;
+      padding: 14px 16px; margin-bottom: 10px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent; transition: border-color .15s;
+    }
+    .tr-card.selected { border-color: #3b82f6; background: #1e2d45; }
+    .tr-radio {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 2px solid #4b5563; flex-shrink: 0; margin-top: 1px;
+      display: flex; align-items: center; justify-content: center; transition: all .15s;
+    }
+    .tr-card.selected .tr-radio {
+      border-color: #3b82f6; background: #3b82f6;
+    }
+    .tr-card.selected .tr-radio::after {
+      content: ''; width: 8px; height: 8px; border-radius: 50%; background: #fff;
+    }
+    .tr-card span { font-size: 14px; color: #d1d5db; line-height: 1.4; }
+    .tr-card-content { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+    .tr-extra-input {
+      width: 100%; padding: 9px 12px; border-radius: 8px;
+      border: 1.5px solid #374151; background: #111827;
+      color: #f9fafb; font-size: 14px; outline: none; font-family: inherit;
+      color-scheme: dark;
+    }
+    .tr-extra-input:focus { border-color: #3b82f6; }
+    .tr-bemerkungen {
+      width: 100%; padding: 10px 12px; border-radius: 10px;
+      border: 1.5px solid #374151; background: #1f2937;
+      color: #f9fafb; font-size: 14px; outline: none; font-family: inherit;
+      resize: vertical; min-height: 80px;
+    }
+    .tr-bemerkungen:focus { border-color: #3b82f6; }
+    /* Nav-Footer im MA-Overlay */
+    #ma-ov-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 10px; padding: 10px 14px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom));
+      background: #1f2937; border-top: 1px solid #374151; flex-shrink: 0;
+    }
+    #ma-btn-back { background: #374151; color: #9ca3af; }
+    #ma-btn-next { background: #3b82f6; color: #fff; }
+    #ma-btn-next.finish { background: #10b981; }
+    #ma-btn-back, #ma-btn-next {
+      padding: 10px 18px; border-radius: 10px; border: none;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      -webkit-tap-highlight-color: transparent; font-family: inherit;
+    }
+    #ma-btn-back:disabled { opacity: .35; pointer-events: none; }
+
+    /* ── Step 4: Projektdetails ── */
+    #step4-wrap {
+      display: none; flex: 1; flex-direction: column; overflow-y: auto;
+      padding: 14px 14px 120px; -webkit-overflow-scrolling: touch;
+      background: #111827;
+    }
+    .s4-section {
+      background: #1f2937; border-radius: 12px; margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .s4-section-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: #6b7280; padding: 12px 14px 6px;
+    }
+    .s4-field { padding: 6px 14px 10px; }
+    .s4-field label {
+      display: block; font-size: 11px; font-weight: 600;
+      color: #9ca3af; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .3px;
+    }
+    .s4-field input[type=text], .s4-field input[type=date] {
+      width: 100%; padding: 10px 12px; border-radius: 8px;
+      border: 1.5px solid #374151; background: #111827;
+      color: #f9fafb; font-size: 15px; outline: none; font-family: inherit;
+    }
+    .s4-field input:focus { border-color: #3b82f6; }
+    .s4-tech-row { display: flex; gap: 8px; }
+    .s4-tech-row input { flex: 1; }
+    .btn-tech-settings {
+      width: 42px; height: 42px; border-radius: 8px;
+      border: 1.5px solid #374151; background: #111827;
+      color: #9ca3af; font-size: 18px; cursor: pointer; flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .s4-nav-card {
+      display: flex; align-items: center; gap: 10px;
+      padding: 13px 14px; cursor: pointer;
+      border-top: 1px solid #374151;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .s4-nav-card:first-of-type { border-top: none; }
+    .s4-nav-card:active { background: #374151; }
+    .s4-nav-card-info { flex: 1; }
+    .s4-nav-card-title { font-size: 14px; font-weight: 600; color: #e5e7eb; }
+    .s4-nav-card-meta  { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .s4-nav-arrow { font-size: 20px; color: #4b5563; font-weight: 300; }
+    /* ── Step 5: Messungen ── */
+    #step5-wrap {
+      display: none; flex: 1; flex-direction: column; overflow-y: auto;
+      padding: 14px 14px 120px; -webkit-overflow-scrolling: touch;
+      background: #111827;
+    }
+    .s5-back-btn {
+      width: 100%; padding: 14px 16px; background: #1f2937;
+      border: 2px solid #374151; border-radius: 12px;
+      font-size: 15px; font-weight: 600;
+      color: #e5e7eb; cursor: pointer; text-align: left; margin-bottom: 10px;
+      font-family: inherit; display: flex; align-items: center; gap: 12px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .s5-back-btn:active { background: #374151; }
+    .s5-report-btn {
+      width: 100%; padding: 14px 16px; background: #1e3a5f;
+      border: 2px solid #3b82f6; border-radius: 12px;
+      font-size: 15px; font-weight: 600; color: #93c5fd;
+      cursor: pointer; text-align: center; margin-top: 6px;
+      font-family: inherit; -webkit-tap-highlight-color: transparent;
+    }
+    .s5-report-btn:active { background: #1e3a5f; opacity: .8; }
+    .s5-card {
+      background: #1f2937; border-radius: 12px; margin-bottom: 10px;
+      border: 2px solid #374151; overflow: hidden;
+      transition: border-color .2s;
+    }
+    .s5-card.optional { border-style: dashed; }
+    .s5-card.active   { border-color: #3b82f6; }
+    .s5-card.done     { border-color: #10b981; }
+    .s5-card-header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 14px 16px; cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .s5-card-header:active { background: rgba(255,255,255,.04); }
+    .s5-status-dot {
+      width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+      border: 2px solid #4b5563; background: transparent;
+      transition: all .2s;
+    }
+    .s5-card.done  .s5-status-dot { background: #10b981; border-color: #10b981; }
+    .s5-card.active .s5-status-dot { border-color: #3b82f6; background: #1e3a5f; }
+    .s5-card-label { flex: 1; font-size: 15px; font-weight: 600; color: #e5e7eb; }
+    .s5-card.done .s5-card-label { color: #6b7280; }
+    .s5-badge-opt {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      color: #6b7280; background: #374151; padding: 2px 7px; border-radius: 10px;
+    }
+    .s5-card-arrow { font-size: 18px; color: #4b5563; }
+    .s5-card-footer {
+      display: none; padding: 0 16px 14px;
+      border-top: 1px solid #374151;
+    }
+    .s5-card.open .s5-card-footer { display: block; }
+    .s5-card-foot-hint { font-size: 12px; color: #6b7280; padding: 10px 0 8px; }
+    .s5-foot-btns { display: flex; gap: 8px; }
+    .s5-btn-done {
+      flex: 1; padding: 11px; border-radius: 8px; border: none;
+      background: #10b981; color: #fff; font-size: 14px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .s5-btn-undo {
+      padding: 11px 14px; border-radius: 8px;
+      border: 1.5px solid #374151; background: none;
+      color: #6b7280; font-size: 14px; cursor: pointer;
+      font-family: inherit; -webkit-tap-highlight-color: transparent;
+    }
+    /* Settings sheet */
+    #sheet-settings {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.65); z-index: 300;
+      align-items: flex-end; justify-content: center;
+    }
+    #sheet-settings.show { display: flex; }
+    .settings-box {
+      background: #1f2937; border-radius: 16px 16px 0 0;
+      width: 100%; max-width: 480px;
+      max-height: 85vh; display: flex; flex-direction: column;
+    }
+    .settings-header {
+      padding: 18px 16px 12px; border-bottom: 1px solid #374151; flex-shrink: 0;
+      font-size: 15px; font-weight: 700; color: #e5e7eb;
+    }
+    .settings-scroll {
+      flex: 1; overflow-y: auto; padding: 12px 16px;
+      -webkit-overflow-scrolling: touch;
+    }
+    .settings-section { margin-bottom: 18px; }
+    .settings-section-title {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: #6b7280; margin-bottom: 8px;
+    }
+    .settings-item-list { display: flex; flex-direction: column; gap: 5px; margin-bottom: 8px; }
+    .settings-item {
+      display: flex; align-items: center; gap: 8px;
+      background: #111827; border-radius: 8px; padding: 9px 12px;
+    }
+    .settings-item span { flex: 1; font-size: 14px; color: #e5e7eb; }
+    .settings-rm {
+      background: none; border: none; color: #4b5563;
+      font-size: 16px; cursor: pointer; padding: 2px 4px;
+    }
+    .settings-rm:active { color: #ef4444; }
+    .settings-add-row { display: flex; gap: 8px; }
+    .settings-add-row input {
+      flex: 1; padding: 9px 11px; border: 1.5px solid #374151;
+      border-radius: 8px; background: #111827; color: #f9fafb;
+      font-size: 14px; outline: none; font-family: inherit;
+    }
+    .settings-add-row input:focus { border-color: #3b82f6; }
+    .settings-add-btn {
+      background: #3b82f6; color: #fff; border: none;
+      border-radius: 8px; padding: 9px 14px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+    }
+    .settings-footer { padding: 10px 16px 28px; flex-shrink: 0; }
+    /* Select styling */
+    .modal select, .modal-select {
+      width: 100%; padding: 9px 11px; border: 1.5px solid #374151;
+      border-radius: 8px; background: #111827; color: #f9fafb;
+      font-size: 14px; outline: none; font-family: inherit;
+      -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center;
+    }
+    .modal select:focus { border-color: #3b82f6; }
+    .btn-sheet-close {
+      width: 100%; padding: 11px; background: none;
+      border: 1.5px solid #374151; border-radius: 8px;
+      font-size: 14px; color: #6b7280; cursor: pointer;
+      margin-top: 12px; font-family: inherit;
+    }
+    /* Home button in workflow header */
+    #btn-home {
+      width: 32px; height: 32px; border-radius: 8px; border: 1.5px solid #374151;
+      background: #111827; color: #9ca3af; font-size: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; -webkit-tap-highlight-color: transparent;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     DASHBOARD
+══════════════════════════════════════════ -->
+<div id="dashboard">
+  <div class="db-header">
+    <div style="min-width:40px"></div>
+    <h1>Aufträge</h1>
+    <button id="btn-settings-db" title="Einstellungen" style="background:none;border:1.5px solid #374151;border-radius:8px;color:#6b7280;font-size:16px;width:34px;height:34px;cursor:pointer;display:flex;align-items:center;justify-content:center;">⚙</button>
+  </div>
+  <div id="db-list-wrap">
+    <div id="db-job-list" class="db-job-list"></div>
+    <div id="db-empty">
+      <span class="db-empty-icon">📋</span>
+      Noch keine Aufträge.<br>Tippe auf <strong>+ Auftrag</strong>.
+    </div>
+  </div>
+</div>
+
+<button id="fab-new">+ Auftrag</button>
+
+<!-- ══════════════════════════════════════════
+     WORKFLOW
+══════════════════════════════════════════ -->
+<div id="app">
+  <div id="header">
+    <button id="btn-home" title="Zur Übersicht">⌂</button>
+    <div id="step-title">Grundriss</div>
+    <button id="btn-projekt" title="Einstellungen">⚙</button>
+  </div>
+
+  <div id="topbar">
+    <div class="tool-row" id="tool-row"></div>
+  </div>
+
+  <div id="canvas-wrap">
+    <div id="canvas-container"></div>
+    <div id="hint">Werkzeug wählen</div>
+    <div id="confirm-overlay">
+      <button id="confirm-btn">✓</button>
+      <button id="cancel-btn">✕</button>
+    </div>
+  </div>
+
+  <!-- Step 4: Projektdetails -->
+  <div id="step4-wrap">
+    <div class="s4-section">
+      <div class="s4-section-title">Projektdaten</div>
+      <div class="s4-field">
+        <label>Bauvorhaben / Objekt</label>
+        <input type="text" id="s4-bauvorhaben" autocomplete="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div class="s4-field">
+        <label>Auftraggeber</label>
+        <input type="text" id="s4-auftraggeber" autocomplete="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div class="s4-field">
+        <label>KV-Nummer</label>
+        <input type="text" id="s4-kvnummer" autocomplete="off" autocorrect="off" spellcheck="false">
+      </div>
+      <div class="s4-field">
+        <label>Techniker</label>
+        <select id="s4-techniker"></select>
+      </div>
+      <div class="s4-field">
+        <label>Datum</label>
+        <input type="date" id="s4-datum">
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Step 5: Projektdetails -->
+  <div id="step5-wrap">
+    <button class="s5-back-btn" id="s5-back-btn">✏️ Projektdaten ändern</button>
+    <div id="s5-card-list"></div>
+    <button class="s5-report-btn" id="s5-report-btn">📄 Messbericht erstellen</button>
+  </div>
+
+</div>
+
+<!-- MA Overlay -->
+<div id="ma-overlay">
+  <div id="ma-ov-header">
+    <button id="ma-ov-close">✕</button>
+    <span id="ma-ov-title">Schadensaufnahme</span>
+    <div style="width:32px"></div>
+  </div>
+  <div id="ma-ov-body">
+    <!-- Screen 1: Kopfdaten -->
+    <div id="ma-screen-info">
+      <div class="ma-section-title">Aufnahmedaten</div>
+      <div class="ma-field"><label>Datum</label><input type="date" id="ma-datum"></div>
+      <div class="ma-field"><label>Name</label><select id="ma-name"></select></div>
+      <div class="ma-field"><label>Messgerät</label><select id="ma-messgeraet"></select></div>
+    </div>
+    <!-- Screen 2: Bereiche Raumklima -->
+    <div id="ma-screen-bereiche" style="display:none">
+      <div class="ma-section-title">Raumklima</div>
+      <div id="ma-bereiche-list"></div>
+    </div>
+    <!-- Screen 3: Pin-Messungen -->
+    <div id="ma-screen-pins" style="display:none">
+      <div class="ma-progress" id="ma-progress-dots"></div>
+      <div class="ma-pin-card">
+        <div class="ma-pin-nr" id="ma-pin-nr"></div>
+        <div class="ma-pin-label" id="ma-pin-label"></div>
+        <div class="ma-pin-bereich" id="ma-pin-bereich"></div>
+        <div class="ma-pin-meta" id="ma-pin-meta"></div>
+        <div class="ma-pin-klima" id="ma-pin-klima" style="display:none"></div>
+        <div class="ma-digits-row">
+          <input type="number" class="ma-digits-input" id="ma-digits" step="0.1" min="0" placeholder="–">
+          <span class="ma-digits-unit">%</span>
+        </div>
+      </div>
+    </div>
+    <!-- Screen 3: Trocknung -->
+    <div id="ma-screen-trocken" style="display:none">
+      <div class="ma-section-title">Beurteilung Trocknung</div>
+
+      <div class="tr-card" data-val="notwendig">
+        <div class="tr-radio"></div>
+        <span>Trocknung notwendig</span>
+      </div>
+      <div class="tr-card" data-val="nicht_notwendig">
+        <div class="tr-radio"></div>
+        <span>Trocknung nicht notwendig</span>
+      </div>
+      <div class="tr-card" data-val="erfolgreich">
+        <div class="tr-radio"></div>
+        <div class="tr-card-content">
+          <span>Trocknung erfolgreich abgeschlossen am</span>
+          <input type="date" class="tr-extra-input" id="tr-datum" style="display:none">
+        </div>
+      </div>
+      <div class="tr-card" data-val="abgebrochen">
+        <div class="tr-radio"></div>
+        <div class="tr-card-content">
+          <span>Trocknung abgebrochen weil</span>
+          <input type="text" class="tr-extra-input" id="tr-grund" placeholder="Grund eingeben…" style="display:none" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="ma-section-title" style="margin-top:20px">Bemerkungen</div>
+      <textarea class="tr-bemerkungen" id="tr-bemerkungen" placeholder="Freitext…" rows="4"></textarea>
+    </div>
+  </div>
+  <div id="ma-ov-footer">
+    <button id="ma-btn-back" disabled>← Zurück</button>
+    <button id="ma-btn-next">Weiter →</button>
+  </div>
+</div>
+
+<!-- Feste Navigationsleiste unten -->
+<div id="nav-bar">
+  <!-- Step-Navigation (nur Schritte 1–4) -->
+  <div id="step-nav">
+    <div class="sn-item active" id="sn-1">
+      <span class="sn-label">projektdaten</span>
+      <div class="sn-dot">1</div>
+    </div>
+    <div class="sn-line"></div>
+    <div class="sn-item" id="sn-2">
+      <span class="sn-label">grundriss</span>
+      <div class="sn-dot">2</div>
+    </div>
+    <div class="sn-line"></div>
+    <div class="sn-item" id="sn-3">
+      <span class="sn-label">bereiche</span>
+      <div class="sn-dot">3</div>
+    </div>
+    <div class="sn-line"></div>
+    <div class="sn-item" id="sn-4">
+      <span class="sn-label">messpunkte</span>
+      <div class="sn-dot">4</div>
+    </div>
+  </div>
+  <!-- Navigationsbuttons -->
+  <div id="nav-btns">
+    <button class="nav-btn back" id="btn-back" disabled>← Zurück</button>
+    <button class="nav-btn next" id="btn-next">Weiter →</button>
+  </div>
+</div>
+
+<!-- Settings Sheet -->
+<div id="sheet-settings">
+  <div class="settings-box">
+    <div class="settings-header">⚙ Einstellungen</div>
+    <div class="settings-scroll" id="settings-scroll"></div>
+    <div class="settings-footer">
+      <button class="btn-sheet-close" id="settings-close">Schließen</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modals ── -->
+<div class="modal-overlay" id="modal-warn">
+  <div class="modal">
+    <h3>Achtung</h3>
+    <p id="modal-warn-text"></p>
+    <div class="modal-btns">
+      <button class="cancel" id="modal-warn-cancel">Abbrechen</button>
+      <button class="ok" id="modal-warn-ok">OK</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-projekt">
+  <div class="modal">
+    <h3>Projektdaten</h3>
+    <label>Bauvorhaben / Objekt</label>
+    <input type="text" id="proj-bauvorhaben" autocomplete="off" autocorrect="off" spellcheck="false">
+    <label>Auftraggeber</label>
+    <input type="text" id="proj-auftraggeber" autocomplete="off" autocorrect="off" spellcheck="false">
+    <label>KV-Nummer</label>
+    <input type="text" id="proj-kvnummer" autocomplete="off" autocorrect="off" spellcheck="false">
+    <div class="modal-btns">
+      <button class="cancel" id="modal-projekt-cancel">Abbrechen</button>
+      <button class="ok" id="modal-projekt-ok">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-bereich-setup">
+  <div class="modal">
+    <h3 id="bs-title">Bereich anlegen</h3>
+    <label>Raum</label>
+    <select id="bs-raum"></select>
+    <label>Bereich</label>
+    <select id="bs-bereich"></select>
+    <div class="modal-btns">
+      <button class="cancel" id="modal-bs-del" style="display:none;color:#ef4444;border-color:#ef4444">Löschen</button>
+      <button class="cancel" id="modal-bs-cancel">Abbrechen</button>
+      <button class="ok" id="modal-bs-ok">Anlegen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-pin-setup">
+  <div class="modal">
+    <h3>Messpunkt <span id="pin-setup-nr"></span></h3>
+    <p id="pin-setup-bereich" style="font-size:12px;color:#6b7280;margin:-4px 0 10px;"></p>
+    <label>Verfahren</label>
+    <select id="ps-verfahren"></select>
+    <label>Material</label>
+    <select id="ps-material"></select>
+    <div class="modal-btns">
+      <button class="cancel" id="modal-ps-del" style="color:#ef4444;border-color:#ef4444">Löschen</button>
+      <button class="ok" id="modal-ps-ok">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-variant">
+  <div class="modal">
+    <h3>Türrichtung wählen</h3>
+    <div id="variant-grid"></div>
+    <div class="modal-btns">
+      <button class="cancel" id="modal-variant-cancel">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-bereich-mess">
+  <div class="modal">
+    <h3 id="bm-title">Bereich</h3>
+    <p id="bm-ma-label"></p>
+    <div class="mess-row">
+      <div>
+        <label>Temperatur (°C)</label>
+        <input type="number" id="bm-temp" step="0.1" min="-20" max="60" placeholder="z.B. 20.5">
+      </div>
+      <div>
+        <label>Luftfeuchte (%)</label>
+        <input type="number" id="bm-rh" step="0.1" min="0" max="100" placeholder="z.B. 65">
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="cancel" id="modal-bm-cancel">Abbrechen</button>
+      <button class="ok" id="modal-bm-ok">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-pin-mess">
+  <div class="modal">
+    <h3 id="pm-title">Messpunkt</h3>
+    <p id="pm-info"></p>
+    <p id="pm-ma-label"></p>
+    <label>Digits (0 – 9999)</label>
+    <input type="number" id="pm-digits" min="0" max="9999" step="1" placeholder="0 – 9999">
+    <div class="modal-btns">
+      <button class="cancel" id="modal-pm-cancel">Abbrechen</button>
+      <button class="ok" id="modal-pm-ok">Speichern</button>
+    </div>
+  </div>
+</div>
+
+
+<div class="modal-overlay" id="modal-new-job">
+  <div class="modal">
+    <h3>Neuer Auftrag</h3>
+    <label>Bauvorhaben / Objekt *</label>
+    <input type="text" id="nj-bauvorhaben" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="z.B. Brühlstraße 7, Konstanz">
+    <label>Auftraggeber</label>
+    <input type="text" id="nj-auftraggeber" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Firma oder Name">
+    <label>KV-Nummer</label>
+    <input type="text" id="nj-kvnummer" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="z.B. 189565">
+    <div class="modal-btns">
+      <button class="cancel" id="nj-cancel">Abbrechen</button>
+      <button class="ok" id="nj-ok">Anlegen ✓</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════════════════
+const W = 1000, H = 1000;
+const SNAP_DIST  = 24;
+const ANGLE_SNAP = 15;
+const WALL_HW    = 8;
+
+const DOOR_VARIANTS = [
+  { label: 'Links / Unten',  baseRot:   0, hingeIsP0: true  },
+  { label: 'Links / Oben',   baseRot: 270, hingeIsP0: true  },
+  { label: 'Rechts / Unten', baseRot:  90, hingeIsP0: false },
+  { label: 'Rechts / Oben',  baseRot: 180, hingeIsP0: false },
+];
+
+const MESSAUFNAHMEN = [
+  { id: 'sa',  label: 'Schadensaufnahme', optional: false },
+  { id: 'ab',  label: 'Aufbau',           optional: false },
+  { id: 'zm1', label: 'ZM 1',             optional: true  },
+  { id: 'zm2', label: 'ZM 2',             optional: true  },
+  { id: 'end', label: 'Abbau',            optional: false },
+];
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════
+function emptyBereichMessungen() {
+  const m = {};
+  MESSAUFNAHMEN.forEach(ma => { m[ma.id] = { temp: null, rh: null }; });
+  return m;
+}
+function emptyPinMessungen() {
+  const m = {};
+  MESSAUFNAHMEN.forEach(ma => { m[ma.id] = { digits: null }; });
+  return m;
+}
+
+let S = {
+  step:     1,
+  aktiveMA: 'sa',
+  projekt:  { bauvorhaben: '', auftraggeber: '', kvNummer: '', techniker: '', datum: '' },
+  maStatus: { sa:'pending', ab:'pending', zm1:'pending', zm2:'pending', end:'pending' },
+  maDates:  { sa:null, ab:null, zm1:null, zm2:null, end:null },
+  maInfo:   { sa:{datum:'',name:'',messgeraet:''}, ab:{datum:'',name:'',messgeraet:''}, zm1:{datum:'',name:'',messgeraet:''}, zm2:{datum:'',name:'',messgeraet:''}, end:{datum:'',name:'',messgeraet:''} },
+  grundriss: {
+    mode: 'none', photo: null, photoRotation: 0, showGrid: false,
+    walls: [], doors: [], windows: [],
+  },
+  bereiche: [],
+  pins:     [],
+  tool:            null,
+  selectedWallId:  null,
+  selectedElement: null,
+  draggingElement: false,
+  wip:             null,
+  pendingPin:      null,
+  grundrissImg:    null,
+};
+
+const _history = [];
+let _idCtr = Date.now();
+function uid() { return (++_idCtr).toString(36); }
+
+// ─── History ────────────────────────────────────────────────────────────────
+function pushHistory() {
+  _history.push(JSON.stringify({
+    w: S.grundriss.walls, d: S.grundriss.doors, wi: S.grundriss.windows,
+    b: S.bereiche, p: S.pins,
+  }));
+  if (_history.length > 40) _history.shift();
+  updateToolbar();
+}
+function undoLast() {
+  if (!_history.length) { toast('Nichts rückgängig zu machen'); return; }
+  const prev = JSON.parse(_history.pop());
+  S.grundriss.walls   = prev.w;
+  S.grundriss.doors   = prev.d;
+  S.grundriss.windows = prev.wi;
+  S.bereiche          = prev.b;
+  S.pins              = prev.p;
+  S.selectedElement = null; S.draggingElement = false;
+  S.selectedWallId  = null; S.wip = null;
+  hideConfirmOverlay();
+  renderAll(); updateToolbar(); save(); defaultHint();
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function findElement(type, id) {
+  return type === 'door'
+    ? S.grundriss.doors.find(d => d.id === id)
+    : S.grundriss.windows.find(w => w.id === id);
+}
+function findWall(id) { return S.grundriss.walls.find(w => w.id === id); }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CONFIRM OVERLAY
+// ═══════════════════════════════════════════════════════════════════════════
+let _confirmCb = null, _cancelCb = null;
+function showConfirmOverlay(onConfirm, onCancel) {
+  _confirmCb = onConfirm; _cancelCb = onCancel || null;
+  document.getElementById('cancel-btn').style.display = onCancel ? '' : 'none';
+  document.getElementById('confirm-overlay').classList.add('show');
+}
+function hideConfirmOverlay() {
+  document.getElementById('confirm-overlay').classList.remove('show');
+  _confirmCb = null; _cancelCb = null;
+}
+document.getElementById('confirm-btn').onclick = () => {
+  if (_confirmCb) { const cb = _confirmCb; hideConfirmOverlay(); cb(); }
+};
+document.getElementById('cancel-btn').onclick = () => {
+  if (_cancelCb) { const cb = _cancelCb; hideConfirmOverlay(); cb(); }
+  else hideConfirmOverlay();
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// KONVA SETUP
+// ═══════════════════════════════════════════════════════════════════════════
+const container = document.getElementById('canvas-container');
+const stage = new Konva.Stage({
+  container: 'canvas-container',
+  width:  container.clientWidth,
+  height: container.clientHeight,
+});
+const bgLayer = new Konva.Layer(), drawLayer = new Konva.Layer(),
+      bereichLayer = new Konva.Layer(), pinLayer = new Konva.Layer(),
+      uiLayer = new Konva.Layer();
+stage.add(bgLayer, drawLayer, bereichLayer, pinLayer, uiLayer);
+
+function fitScreen() {
+  const sw = stage.width(), sh = stage.height();
+  const sc = Math.min(sw / W, sh / H) * 0.88;
+  stage.scale({ x: sc, y: sc });
+  stage.position({ x: (sw - W * sc) / 2, y: (sh - H * sc) / 2 });
+  stage.batchDraw();
+}
+fitScreen();
+window.addEventListener('resize', () => {
+  stage.width(container.clientWidth);
+  stage.height(container.clientHeight);
+  fitScreen(); renderAll();
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// ZOOM + PAN
+// ═══════════════════════════════════════════════════════════════════════════
+stage.on('wheel', e => {
+  e.evt.preventDefault();
+  const old = stage.scaleX(), ptr = stage.getPointerPosition();
+  const nw  = Math.max(0.2, Math.min(12, old * (e.evt.deltaY < 0 ? 1.1 : 0.9)));
+  const wp  = { x: (ptr.x - stage.x()) / old, y: (ptr.y - stage.y()) / old };
+  stage.scale({ x: nw, y: nw });
+  stage.position({ x: ptr.x - wp.x * nw, y: ptr.y - wp.y * nw });
+  stage.batchDraw();
+});
+
+let pinchData = null;
+const cw = document.getElementById('canvas-wrap');
+cw.addEventListener('touchstart', e => {
+  if (e.touches.length === 2)
+    pinchData = { dist: tDist(e.touches), mid: tMid(e.touches), sx: stage.x(), sy: stage.y(), sc: stage.scaleX() };
+}, { passive: true });
+cw.addEventListener('touchmove', e => {
+  if (e.touches.length === 2 && pinchData) {
+    e.preventDefault();
+    const nd = tDist(e.touches), nm = tMid(e.touches);
+    const sc = Math.max(0.2, Math.min(12, pinchData.sc * nd / pinchData.dist));
+    const dx = nm.x - pinchData.mid.x, dy = nm.y - pinchData.mid.y;
+    const wp = { x: (pinchData.mid.x - pinchData.sx) / pinchData.sc, y: (pinchData.mid.y - pinchData.sy) / pinchData.sc };
+    stage.scale({ x: sc, y: sc });
+    stage.position({ x: pinchData.mid.x - wp.x * sc + dx, y: pinchData.mid.y - wp.y * sc + dy });
+    stage.batchDraw();
+  }
+}, { passive: false });
+cw.addEventListener('touchend', e => { if (e.touches.length < 2) pinchData = null; }, { passive: true });
+function tDist(t) { return Math.hypot(t[0].clientX-t[1].clientX, t[0].clientY-t[1].clientY); }
+function tMid(t)  { return { x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2 }; }
+
+let panData = null;
+let _suppressMouse = false;
+
+function _handleDown(wp, isPan) {
+  if (isPan) {
+    // Bereiche/Pins zuerst auf Tap-to-Edit prüfen — nur wenn kein Tool aktiv
+    let handled = false;
+    if (!S.tool) {
+      if (S.step === 3) handled = onStep2Down(wp);
+      if (S.step === 4) handled = onStep3Down(wp);
+    }
+    if (!handled) {
+      const sp = stage.getPointerPosition();
+      if (sp) panData = { sx: stage.x(), sy: stage.y(), px: sp.x, py: sp.y };
+    }
+    return;
+  }
+  if (S.step === 2) onStep1Down(wp);
+  if (S.step === 3) onStep2Down(wp);
+  if (S.step === 4) onStep3Down(wp);
+}
+
+stage.on('touchstart', e => {
+  if (pinchData || e.evt.touches?.length > 1) return;
+  if (S.pendingPin) return;
+  _suppressMouse = true;
+  setTimeout(() => { _suppressMouse = false; }, 600);
+  _handleDown(getWP(), !S.tool || S.tool === 'pan');
+});
+stage.on('mousedown', () => {
+  if (_suppressMouse || pinchData) return;
+  if (S.pendingPin) return;
+  _handleDown(getWP(), !S.tool || S.tool === 'pan');
+});
+stage.on('mousemove touchmove', e => {
+  if (panData && (!S.tool || S.tool === 'pan')) {
+    if (e.evt.touches?.length > 1) return;
+    const sp = stage.getPointerPosition(); if (!sp) return;
+    stage.position({ x: panData.sx + sp.x - panData.px, y: panData.sy + sp.y - panData.py });
+    stage.batchDraw();
+  }
+  if (!S.tool || S.tool === 'pan') return;
+  const wp = getWP(); if (!wp) return;
+  if (S.step === 2) onStep1Move(wp);
+  if (S.step === 3) onStep2Move(wp);
+});
+stage.on('mouseup touchend', () => {
+  panData = null;
+  if (S.draggingElement) { S.draggingElement = false; renderDraw(); save(); }
+});
+stage.on('dblclick dbltap', () => {
+  if (S.wip?.type === 'wall') { S.wip = null; renderUI(); updateToolbar(); defaultHint(); }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GEOMETRY UTILS
+// ═══════════════════════════════════════════════════════════════════════════
+function s2w(sp) {
+  const sc = stage.scaleX(), p = stage.position();
+  return { x: (sp.x - p.x) / sc, y: (sp.y - p.y) / sc };
+}
+function getWP() { const sp = stage.getPointerPosition(); return sp ? s2w(sp) : null; }
+
+function snapEndpoint(wx, wy) {
+  let best = null, bd = SNAP_DIST;
+  for (const w of S.grundriss.walls)
+    for (const pt of [{x:w.x1,y:w.y1},{x:w.x2,y:w.y2}]) {
+      const d = Math.hypot(pt.x-wx, pt.y-wy);
+      if (d < bd) { bd = d; best = {x:pt.x,y:pt.y}; }
+    }
+  return best;
+}
+function snapAngle(x1, y1, x2, y2) {
+  const dx=x2-x1, dy=y2-y1;
+  if (!dx && !dy) return {x:x2,y:y2};
+  const ang = Math.atan2(dy,dx)*180/Math.PI;
+  const snaps = [0,45,90,135,180,-45,-90,-135,-180];
+  let best=ang, minD=999;
+  for (const s of snaps) { const d=Math.abs(ang-s); if(d<minD){minD=d;best=s;} }
+  if (minD > ANGLE_SNAP) return {x:x2,y:y2};
+  const len=Math.hypot(dx,dy), r=best*Math.PI/180;
+  return { x:x1+len*Math.cos(r), y:y1+len*Math.sin(r) };
+}
+function distToSeg(px,py,ax,ay,bx,by) {
+  const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;
+  if(!l2) return Math.hypot(px-ax,py-ay);
+  const t=Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/l2));
+  return Math.hypot(px-(ax+t*dx),py-(ay+t*dy));
+}
+function projectOnWall(wall,wx,wy) {
+  const dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,l2=dx*dx+dy*dy;
+  if(!l2) return 0.5;
+  return Math.max(0.05,Math.min(0.95,((wx-wall.x1)*dx+(wy-wall.y1)*dy)/l2));
+}
+function wallPt(wall,t) { return {x:wall.x1+(wall.x2-wall.x1)*t,y:wall.y1+(wall.y2-wall.y1)*t}; }
+function wallLen(wall)  { return Math.hypot(wall.x2-wall.x1,wall.y2-wall.y1); }
+function wallAng(wall)  { return Math.atan2(wall.y2-wall.y1,wall.x2-wall.x1); }
+function hitWall(wx,wy) {
+  for (const w of S.grundriss.walls)
+    if (distToSeg(wx,wy,w.x1,w.y1,w.x2,w.y2)<14) return w;
+  return null;
+}
+function pointInPoly(px,py,pts) {
+  let inside=false;
+  for (let i=0,j=pts.length-1;i<pts.length;j=i++) {
+    const xi=pts[i].x,yi=pts[i].y,xj=pts[j].x,yj=pts[j].y;
+    if((yi>py)!==(yj>py)&&px<(xj-xi)*(py-yi)/(yj-yi)+xi) inside=!inside;
+  }
+  return inside;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════════════════════════════════
+const AREA_COLORS = ['#60a5fa','#34d399','#fbbf24','#f87171','#a78bfa','#38bdf8','#fb923c'];
+
+function renderAll() { renderBg(); renderDraw(); renderBereiche(); renderPins(); renderUI(); }
+
+function renderBg() {
+  bgLayer.destroyChildren();
+  bgLayer.add(new Konva.Rect({x:0,y:0,width:W,height:H,fill:'#ffffff',listening:false}));
+  if (S.grundriss.mode === 'photo' && S.grundriss.photo) {
+    const img = new Image();
+    img.onload = () => {
+      const rot=S.grundriss.photoRotation||0, sw=rot===90||rot===270;
+      bgLayer.add(new Konva.Image({
+        image:img,x:W/2,y:H/2,
+        width:sw?H:W,height:sw?W:H,
+        offsetX:sw?H/2:W/2,offsetY:sw?W/2:H/2,
+        rotation:rot,listening:false,
+      }));
+      bgLayer.batchDraw();
+    };
+    img.src = S.grundriss.photo.dataUrl;
+  } else if (S.grundriss.mode === 'drawing') {
+    if (S.grundriss.showGrid) {
+      for (let x=0;x<=W;x+=50) bgLayer.add(new Konva.Line({points:[x,0,x,H],stroke:'#e5e7eb',strokeWidth:.5,listening:false}));
+      for (let y=0;y<=H;y+=50) bgLayer.add(new Konva.Line({points:[0,y,W,y],stroke:'#e5e7eb',strokeWidth:.5,listening:false}));
+    }
+    bgLayer.add(new Konva.Rect({x:0,y:0,width:W,height:H,stroke:'#d1d5db',strokeWidth:1,listening:false}));
+  } else {
+    bgLayer.add(new Konva.Text({
+      x:W/2,y:H/2-30,
+      text:'📷  Foto aufnehmen\noder  ═  Grundriss zeichnen',
+      fontSize:20,fill:'#9ca3af',align:'center',listening:false,offsetX:130,
+    }));
+  }
+  bgLayer.batchDraw();
+}
+
+function renderDraw() {
+  drawLayer.destroyChildren();
+  for (const wall of S.grundriss.walls)
+    wall.type==='outer' ? drawOuterWall(wall) : drawInnerWall(wall);
+  for (const d   of S.grundriss.doors)   { const w=findWall(d.wallId);   if(w) drawGap(w,d);   }
+  for (const win of S.grundriss.windows) { const w=findWall(win.wallId); if(w) drawGap(w,win); }
+  for (const d   of S.grundriss.doors)   { const w=findWall(d.wallId);   if(w) drawDoor(w,d);   }
+  for (const win of S.grundriss.windows) { const w=findWall(win.wallId); if(w) drawWindow(w,win); }
+  const selW = findWall(S.selectedWallId);
+  if (selW) {
+    drawLayer.add(new Konva.Line({
+      points:[selW.x1,selW.y1,selW.x2,selW.y2],
+      stroke:'#93c5fd',strokeWidth:selW.type==='outer'?WALL_HW*2+6:12,
+      lineCap:'square',opacity:.35,listening:false,
+    }));
+  }
+  if (S.grundriss.mode==='drawing') {
+    for (const d of S.grundriss.doors) {
+      const w=findWall(d.wallId); if(!w) continue;
+      const c=wallPt(w,d.t), sel=S.selectedElement?.type==='door'&&S.selectedElement?.id===d.id;
+      drawLayer.add(new Konva.Circle({x:c.x,y:c.y,radius:sel?14:10,
+        fill:sel?'#ef4444':'rgba(239,68,68,.2)',stroke:'#ef4444',strokeWidth:sel?2.5:1.5,listening:false}));
+    }
+    for (const win of S.grundriss.windows) {
+      const w=findWall(win.wallId); if(!w) continue;
+      const c=wallPt(w,win.t), sel=S.selectedElement?.type==='window'&&S.selectedElement?.id===win.id;
+      drawLayer.add(new Konva.Circle({x:c.x,y:c.y,radius:sel?14:10,
+        fill:sel?'#3b82f6':'rgba(59,130,246,.2)',stroke:'#3b82f6',strokeWidth:sel?2.5:1.5,listening:false}));
+    }
+  }
+  drawLayer.batchDraw();
+}
+
+function drawOuterWall(wall) {
+  const dx=wall.x2-wall.x1,dy=wall.y2-wall.y1,len=wallLen(wall);
+  if(len<1) return;
+  const nx=-dy/len*WALL_HW, ny=dx/len*WALL_HW;
+  drawLayer.add(new Konva.Line({
+    points:[wall.x1+nx,wall.y1+ny,wall.x2+nx,wall.y2+ny,wall.x2-nx,wall.y2-ny,wall.x1-nx,wall.y1-ny],
+    closed:true,fill:'#e5e7eb',stroke:'#111827',strokeWidth:2,listening:false,
+  }));
+}
+function drawInnerWall(wall) {
+  drawLayer.add(new Konva.Line({points:[wall.x1,wall.y1,wall.x2,wall.y2],stroke:'#6b7280',strokeWidth:3,lineCap:'square',listening:false}));
+  drawLayer.add(new Konva.Line({points:[wall.x1,wall.y1,wall.x2,wall.y2],stroke:'#d1d5db',strokeWidth:1,dash:[8,4],lineCap:'round',listening:false}));
+}
+function drawGap(wall, elem) {
+  const len=wallLen(wall); if(len<1) return;
+  const hw=elem.w/2;
+  const p0=wallPt(wall,Math.max(0,elem.t-hw/len));
+  const p1=wallPt(wall,Math.min(1,elem.t+hw/len));
+  const gapH=wall.type==='outer'?WALL_HW*2+4:10;
+  const gapL=Math.hypot(p1.x-p0.x,p1.y-p0.y)+1;
+  drawLayer.add(new Konva.Rect({x:p0.x,y:p0.y,width:gapL,height:gapH,offsetY:gapH/2,rotation:wallAng(wall)*180/Math.PI,fill:'#ffffff',listening:false}));
+}
+function drawDoor(wall, d) {
+  const len=wallLen(wall); if(len<1) return;
+  const hw=d.w/2;
+  const p0=wallPt(wall,Math.max(0,d.t-hw/len));
+  const p1=wallPt(wall,Math.min(1,d.t+hw/len));
+  const angDeg=wallAng(wall)*180/Math.PI;
+  const sel=S.selectedElement?.type==='door'&&S.selectedElement?.id===d.id;
+  const c=sel?'#f97316':'#ef4444';
+  const vi=d.variant??(d.flip?2:0);
+  const v=DOOR_VARIANTS[vi];
+  const hinge=v.hingeIsP0?p0:p1;
+  drawLayer.add(new Konva.Line({points:[p0.x,p0.y,p1.x,p1.y],stroke:c,strokeWidth:2.5,listening:false}));
+  drawLayer.add(new Konva.Arc({x:hinge.x,y:hinge.y,innerRadius:0,outerRadius:d.w,angle:90,rotation:v.baseRot+angDeg,stroke:c,strokeWidth:1.5,fill:sel?'rgba(249,115,22,.12)':'rgba(239,68,68,.08)',listening:false}));
+}
+function drawWindow(wall, win) {
+  const len=wallLen(wall); if(len<1) return;
+  const hw=win.w/2;
+  const p0=wallPt(wall,Math.max(0,win.t-hw/len));
+  const p1=wallPt(wall,Math.min(1,win.t+hw/len));
+  const perp=wallAng(wall)+Math.PI/2;
+  const sel=S.selectedElement?.type==='window'&&S.selectedElement?.id===win.id;
+  const c=sel?'#60a5fa':'#3b82f6';
+  for (const off of [-4,0,4]) {
+    const ox=Math.cos(perp)*off,oy=Math.sin(perp)*off;
+    drawLayer.add(new Konva.Line({points:[p0.x+ox,p0.y+oy,p1.x+ox,p1.y+oy],stroke:c,strokeWidth:off===0?1:2,listening:false}));
+  }
+}
+
+function renderBereiche() {
+  bereichLayer.destroyChildren();
+  S.bereiche.forEach((b,i) => {
+    const color = AREA_COLORS[i % AREA_COLORS.length];
+    bereichLayer.add(new Konva.Line({points:b.pts.flatMap(p=>[p.x,p.y]),closed:true,fill:color+'30',stroke:color,strokeWidth:2,listening:false}));
+    const cx = b.pts.reduce((s,p)=>s+p.x,0)/b.pts.length;
+    const cy = b.pts.reduce((s,p)=>s+p.y,0)/b.pts.length;
+    const line1 = b.raum || '';
+    const line2 = b.bereichName || b.name || 'Bereich';
+    const labelText = line1 ? line1+'\n'+line2 : line2;
+    const tag = new Konva.Tag({fill:'rgba(255,255,255,.9)',cornerRadius:4});
+    const txt = new Konva.Text({text:labelText,fontSize:12,fill:'#111827',padding:4,fontStyle:'600',align:'center'});
+    const lbl = new Konva.Label({x:cx,y:cy,listening:false});
+    lbl.add(tag); lbl.add(txt);
+    lbl.offsetX(txt.width()/2+4); lbl.offsetY(txt.height()/2+4);
+    bereichLayer.add(lbl);
+    // Status-Indikator in Schritt 5
+    if (S.step === 5) {
+      const m = b.messungen?.[S.aktiveMA];
+      const filled = m && (m.temp !== null || m.rh !== null);
+      bereichLayer.add(new Konva.Circle({
+        x: cx, y: cy - txt.height()/2 - 16,
+        radius: 6,
+        fill:   filled ? '#10b981' : '#374151',
+        stroke: filled ? '#6ee7b7' : '#6b7280',
+        strokeWidth: 1.5, listening: false,
+      }));
+    }
+  });
+  bereichLayer.batchDraw();
+}
+
+function renderPins() {
+  pinLayer.destroyChildren();
+  for (const pin of S.pins) {
+    const inStep4 = false; // Messungen-Canvas nicht mehr aktiv
+    const m = pin.messungen?.[S.aktiveMA];
+    const filled = inStep4 && m && m.digits !== null;
+    const fillColor = inStep4 ? (filled ? '#10b981' : '#6b7280') : '#ef4444';
+    const g = new Konva.Group({x:pin.x,y:pin.y,draggable:S.step===4,id:pin.id});
+    g.add(new Konva.Circle({radius:10,fill:fillColor,stroke:'#fff',strokeWidth:2}));
+    const room = S.bereiche.find(b=>b.id===pin.bereichId);
+    const roomLabel = room ? (room.bereichName||room.name||'') : '';
+    g.add(new Konva.Text({text:pin.label+(roomLabel?'\n'+roomLabel:''),fontSize:11,fill:'#fff',fontStyle:'bold',align:'center',width:60,offsetX:30,offsetY:-20}));
+    g.on('dragend',()=>{ pin.x=g.x();pin.y=g.y();detectPinRoom(pin);renderPins();save(); });
+    pinLayer.add(g);
+  }
+  if (S.pendingPin) {
+    const g = new Konva.Group({x:S.pendingPin.x,y:S.pendingPin.y,draggable:true});
+    g.add(new Konva.Circle({radius:15,fill:'#f97316',stroke:'#fff',strokeWidth:3,opacity:.9}));
+    g.add(new Konva.Circle({radius:22,stroke:'#f97316',strokeWidth:1.5,opacity:.35}));
+    g.add(new Konva.Text({text:'?',fontSize:14,fill:'#fff',fontStyle:'bold',align:'center',offsetX:5,offsetY:7}));
+    g.on('dragmove',()=>{ S.pendingPin.x=g.x();S.pendingPin.y=g.y(); });
+    pinLayer.add(g);
+  }
+  pinLayer.batchDraw();
+}
+
+function renderUI() {
+  uiLayer.destroyChildren();
+  if (S.wip?.type==='wall' && S.wip.x1!=null) {
+    const x2=S.wip.x2??S.wip.x1, y2=S.wip.y2??S.wip.y1;
+    if (S.wip.wallType==='outer') {
+      const dx=x2-S.wip.x1,dy=y2-S.wip.y1,len=Math.hypot(dx,dy);
+      if (len>1) {
+        const nx=-dy/len*WALL_HW,ny=dx/len*WALL_HW;
+        uiLayer.add(new Konva.Line({points:[S.wip.x1+nx,S.wip.y1+ny,x2+nx,y2+ny,x2-nx,y2-ny,S.wip.x1-nx,S.wip.y1-ny],closed:true,fill:'rgba(229,231,235,.5)',stroke:'#3b82f6',strokeWidth:2,dash:[6,3],listening:false}));
+      }
+    } else {
+      uiLayer.add(new Konva.Line({points:[S.wip.x1,S.wip.y1,x2,y2],stroke:'#3b82f6',strokeWidth:3,dash:[8,4],lineCap:'square',listening:false}));
+    }
+    uiLayer.add(new Konva.Circle({x:S.wip.x1,y:S.wip.y1,radius:5,fill:'#3b82f6',listening:false}));
+  }
+  if (S.wip?.type==='bereich' && S.wip.pts?.length) {
+    const flat=S.wip.pts.flatMap(p=>[p.x,p.y]);
+    if (S.wip.cursor) flat.push(S.wip.cursor.x,S.wip.cursor.y);
+    uiLayer.add(new Konva.Line({points:flat,stroke:'#34d399',strokeWidth:2,dash:[8,4],listening:false}));
+    for (const pt of S.wip.pts) uiLayer.add(new Konva.Circle({x:pt.x,y:pt.y,radius:4,fill:'#34d399',listening:false}));
+    uiLayer.add(new Konva.Circle({x:S.wip.pts[0].x,y:S.wip.pts[0].y,radius:12,stroke:'#34d399',strokeWidth:2,dash:[4,2],listening:false}));
+  }
+  if (S.wip?.snap) uiLayer.add(new Konva.Circle({x:S.wip.snap.x,y:S.wip.snap.y,radius:11,stroke:'#3b82f6',strokeWidth:2,dash:[4,2],listening:false}));
+  uiLayer.batchDraw();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCHRITT 1 — GRUNDRISS
+// ═══════════════════════════════════════════════════════════════════════════
+function startElementEdit(type, id) {
+  S.selectedElement={type,id}; S.selectedWallId=null; S.tool='select';
+  renderDraw(); updateToolbar();
+  setHint(`${type==='door'?'Tür':'Fenster'} gewählt — Ziehen=verschieben · −/+=Größe${type==='door'?' · ↕=Richtung':''} · ✓=fertig`);
+  showConfirmOverlay(() => {
+    S.selectedElement=null; S.tool=null;
+    renderDraw(); updateToolbar(); defaultHint();
+  });
+}
+function onStep1Down(wp) {
+  const tool=S.tool;
+  if (tool==='wall_outer'||tool==='wall_inner') {
+    const sn=snapEndpoint(wp.x,wp.y), pt=sn||wp;
+    if (!S.wip||S.wip.type!=='wall') {
+      S.wip={type:'wall',wallType:tool==='wall_outer'?'outer':'inner',x1:pt.x,y1:pt.y,snap:sn};
+    } else {
+      pushHistory();
+      const end=snapAngle(S.wip.x1,S.wip.y1,wp.x,wp.y);
+      const se=snapEndpoint(end.x,end.y);
+      const ex=se?se.x:end.x, ey=se?se.y:end.y;
+      S.grundriss.walls.push({id:uid(),x1:S.wip.x1,y1:S.wip.y1,x2:ex,y2:ey,type:S.wip.wallType});
+      S.wip={type:'wall',wallType:S.wip.wallType,x1:ex,y1:ey};
+      renderDraw(); save();
+    }
+    renderUI(); return;
+  }
+  if (tool==='select') {
+    if (S.selectedElement) {
+      const elem=findElement(S.selectedElement.type,S.selectedElement.id);
+      if (elem) {
+        const wall=findWall(elem.wallId);
+        if (wall && Math.hypot(wallPt(wall,elem.t).x-wp.x,wallPt(wall,elem.t).y-wp.y)<40) { S.draggingElement=true; return; }
+      }
+      S.selectedElement=null; hideConfirmOverlay();
+    }
+    for (const d of S.grundriss.doors) {
+      const wall=findWall(d.wallId); if(!wall) continue;
+      if (Math.hypot(wallPt(wall,d.t).x-wp.x,wallPt(wall,d.t).y-wp.y)<25) { startElementEdit('door',d.id); return; }
+    }
+    for (const win of S.grundriss.windows) {
+      const wall=findWall(win.wallId); if(!wall) continue;
+      if (Math.hypot(wallPt(wall,win.t).x-wp.x,wallPt(wall,win.t).y-wp.y)<25) { startElementEdit('window',win.id); return; }
+    }
+    const hitW=hitWall(wp.x,wp.y);
+    if (hitW) {
+      S.selectedWallId=S.selectedWallId===hitW.id?null:hitW.id;
+      renderDraw(); updateToolbar();
+      setHint(S.selectedWallId?'Wand gewählt — Tür oder Fenster einfügen':'Wand, Tür oder Fenster antippen');
+      return;
+    }
+    S.selectedWallId=null; renderDraw(); updateToolbar(); defaultHint(); return;
+  }
+  if (tool==='door') {
+    const wall=findWall(S.selectedWallId);
+    if(!wall){toast('Zuerst eine Wand antippen (Auswahl-Tool)');return;}
+    pushHistory();
+    const nd={id:uid(),wallId:wall.id,t:projectOnWall(wall,wp.x,wp.y),w:80,variant:0};
+    S.grundriss.doors.push(nd); renderDraw(); save();
+    startElementEdit('door',nd.id); return;
+  }
+  if (tool==='window') {
+    const wall=findWall(S.selectedWallId);
+    if(!wall){toast('Zuerst eine Wand antippen (Auswahl-Tool)');return;}
+    pushHistory();
+    const nw={id:uid(),wallId:wall.id,t:projectOnWall(wall,wp.x,wp.y),w:100};
+    S.grundriss.windows.push(nw); renderDraw(); save();
+    startElementEdit('window',nw.id); return;
+  }
+  if (tool==='eraser') {
+    const wall=hitWall(wp.x,wp.y);
+    if (wall) {
+      pushHistory();
+      S.grundriss.walls=S.grundriss.walls.filter(w=>w.id!==wall.id);
+      S.grundriss.doors=S.grundriss.doors.filter(d=>d.wallId!==wall.id);
+      S.grundriss.windows=S.grundriss.windows.filter(w=>w.wallId!==wall.id);
+      if(S.selectedWallId===wall.id){S.selectedWallId=null;updateToolbar();}
+      renderDraw();save();return;
+    }
+    for (const d of S.grundriss.doors) {
+      const w=findWall(d.wallId);if(!w)continue;
+      if(Math.hypot(wallPt(w,d.t).x-wp.x,wallPt(w,d.t).y-wp.y)<28){pushHistory();S.grundriss.doors=S.grundriss.doors.filter(x=>x.id!==d.id);renderDraw();save();return;}
+    }
+    for (const win of S.grundriss.windows) {
+      const w=findWall(win.wallId);if(!w)continue;
+      if(Math.hypot(wallPt(w,win.t).x-wp.x,wallPt(w,win.t).y-wp.y)<28){pushHistory();S.grundriss.windows=S.grundriss.windows.filter(x=>x.id!==win.id);renderDraw();save();return;}
+    }
+  }
+}
+function onStep1Move(wp) {
+  if (S.draggingElement&&S.selectedElement) {
+    const elem=findElement(S.selectedElement.type,S.selectedElement.id);
+    if(elem){const wall=findWall(elem.wallId);if(wall){elem.t=projectOnWall(wall,wp.x,wp.y);renderDraw();}}
+    return;
+  }
+  if(!S.wip||S.wip.type!=='wall'||S.wip.x1==null) return;
+  const ang=snapAngle(S.wip.x1,S.wip.y1,wp.x,wp.y);
+  const sn=snapEndpoint(ang.x,ang.y);
+  S.wip.x2=sn?sn.x:ang.x; S.wip.y2=sn?sn.y:ang.y; S.wip.snap=sn;
+  renderUI();
+}
+function resizeElement(delta) {
+  const elem=findElement(S.selectedElement.type,S.selectedElement.id);if(!elem)return;
+  pushHistory(); elem.w=Math.max(30,Math.min(280,elem.w+delta));
+  renderDraw();save();
+}
+function deleteSelectedElement() {
+  pushHistory();
+  if(S.selectedElement.type==='door') S.grundriss.doors=S.grundriss.doors.filter(d=>d.id!==S.selectedElement.id);
+  else S.grundriss.windows=S.grundriss.windows.filter(w=>w.id!==S.selectedElement.id);
+  S.selectedElement=null; hideConfirmOverlay();
+  renderDraw();updateToolbar();save();defaultHint();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCHRITT 2 — BEREICHE
+// ═══════════════════════════════════════════════════════════════════════════
+function onStep2Down(wp) {
+  if (S.tool==='bereich') {
+    const sn=snapEndpoint(wp.x,wp.y), pt=sn?{x:sn.x,y:sn.y}:{x:wp.x,y:wp.y};
+    if(!S.wip||S.wip.type!=='bereich') {
+      S.wip={type:'bereich',pts:[pt]};
+    } else {
+      const fp=S.wip.pts[0];
+      if(S.wip.pts.length>=3&&Math.hypot(pt.x-fp.x,pt.y-fp.y)<SNAP_DIST){finishBereich();return;}
+      S.wip.pts.push(pt);
+    }
+    S.wip.snap=sn; renderUI(); return;
+  }
+  if (S.tool==='eraser') {
+    const hit=S.bereiche.find(b=>pointInPoly(wp.x,wp.y,b.pts));
+    if(hit){pushHistory();S.bereiche=S.bereiche.filter(b=>b.id!==hit.id);renderBereiche();save();}
+    return;
+  }
+  // Kein aktives Tool → vorhandenen Bereich antippen zum Bearbeiten
+  if (!S.tool) {
+    const hit=S.bereiche.find(b=>pointInPoly(wp.x,wp.y,b.pts));
+    if(hit) { editBereichModal(hit); return true; }
+  }
+  return false;
+}
+function onStep2Move(wp) {
+  if(S.wip?.type!=='bereich') return;
+  const sn=snapEndpoint(wp.x,wp.y);
+  S.wip.cursor=sn||wp; S.wip.snap=sn; renderUI();
+}
+function finishBereich() {
+  const pts=[...S.wip.pts]; S.wip=null; renderUI();
+  showBereichSetupModal(pts);
+}
+
+let _bsPts = null;
+let _editBereichId = null;
+
+function showBereichSetupModal(pts) {
+  _bsPts = pts; _editBereichId = null;
+  fillSelect('bs-raum',    _settings.raum,    '');
+  fillSelect('bs-bereich', _settings.bereich, '');
+  document.getElementById('bs-title').textContent = 'Bereich anlegen';
+  document.getElementById('modal-bs-ok').textContent = 'Anlegen';
+  document.getElementById('modal-bs-del').style.display = 'none';
+  document.getElementById('modal-bereich-setup').classList.add('show');
+}
+
+function editBereichModal(b) {
+  _bsPts = null; _editBereichId = b.id;
+  fillSelect('bs-raum',    _settings.raum,    b.raum        || '');
+  fillSelect('bs-bereich', _settings.bereich, b.bereichName || '');
+  document.getElementById('bs-title').textContent = 'Bereich bearbeiten';
+  document.getElementById('modal-bs-ok').textContent = 'Speichern';
+  document.getElementById('modal-bs-del').style.display = '';
+  document.getElementById('modal-bereich-setup').classList.add('show');
+}
+
+document.getElementById('modal-bs-ok').onclick = () => {
+  const raum        = document.getElementById('bs-raum').value;
+  const bereichName = document.getElementById('bs-bereich').value || 'Bereich';
+  document.getElementById('modal-bereich-setup').classList.remove('show');
+  pushHistory();
+  if (_editBereichId) {
+    const b = S.bereiche.find(b => b.id === _editBereichId);
+    if (b) { b.raum = raum; b.bereichName = bereichName; }
+  } else {
+    S.bereiche.push({ id:uid(), pts:_bsPts, raum, bereichName, messungen:emptyBereichMessungen() });
+  }
+  _bsPts = null; _editBereichId = null;
+  renderBereiche(); save();
+};
+document.getElementById('modal-bs-del').onclick = () => {
+  if (!_editBereichId) return;
+  document.getElementById('modal-bereich-setup').classList.remove('show');
+  pushHistory();
+  S.bereiche = S.bereiche.filter(b => b.id !== _editBereichId);
+  _editBereichId = null; renderBereiche(); save();
+};
+document.getElementById('modal-bs-cancel').onclick = () => {
+  document.getElementById('modal-bereich-setup').classList.remove('show');
+  _bsPts = null; _editBereichId = null;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCHRITT 3 — MESSPUNKTE
+// ═══════════════════════════════════════════════════════════════════════════
+function onStep3Down(wp) {
+  if (S.tool==='pin') {
+    S.pendingPin={x:wp.x,y:wp.y};
+    renderPins();
+    setHint('Standort per Ziehen anpassen, dann ✓ tippen');
+    showConfirmOverlay(
+      () => {
+        const {x,y}=S.pendingPin; S.pendingPin=null;
+        pushHistory();
+        const label=String(S.pins.length+1);
+        const pin={id:uid(),x,y,label,bereichId:null,verfahren:'WI',material:'',messungen:emptyPinMessungen()};
+        detectPinRoom(pin); S.pins.push(pin); renderPins(); save();
+        openPinSetupModal(pin);
+      },
+      () => { S.pendingPin=null; renderPins(); defaultHint(); }
+    );
+    return;
+  }
+  if (S.tool==='eraser') {
+    const hit=S.pins.find(p=>Math.hypot(p.x-wp.x,p.y-wp.y)<18);
+    if(hit){pushHistory();S.pins=S.pins.filter(p=>p.id!==hit.id);renderPins();save();}
+    return;
+  }
+  // Kein aktives Tool → vorhandenen Pin antippen zum Bearbeiten
+  if (!S.tool) {
+    const hit=S.pins.find(p=>Math.hypot(p.x-wp.x,p.y-wp.y)<18);
+    if(hit) { openPinSetupModal(hit); return true; }
+  }
+  return false;
+}
+function detectPinRoom(pin) {
+  pin.bereichId=null;
+  for(const b of S.bereiche){if(pointInPoly(pin.x,pin.y,b.pts)){pin.bereichId=b.id;break;}}
+}
+
+// ─── Pin Setup Modal ─────────────────────────────────────────────────────────
+let _currentPinSetup = null;
+function openPinSetupModal(pin) {
+  _currentPinSetup=pin;
+  fillSelect('ps-verfahren', _settings.verfahren, pin.verfahren || _settings.verfahren[0] || '');
+  fillSelect('ps-material',  _settings.material,  pin.material  || '');
+  document.getElementById('pin-setup-nr').textContent=pin.label;
+  const b = S.bereiche.find(b => b.id === pin.bereichId);
+  const bereichInfo = b
+    ? [b.raum, b.bereichName].filter(Boolean).join(' / ')
+    : 'Kein Bereich';
+  document.getElementById('pin-setup-bereich').textContent = bereichInfo;
+  document.getElementById('modal-pin-setup').classList.add('show');
+  setHint('Verfahren und Material eingeben');
+}
+document.getElementById('modal-ps-ok').onclick = () => {
+  if(!_currentPinSetup) return;
+  _currentPinSetup.verfahren=document.getElementById('ps-verfahren').value;
+  _currentPinSetup.material=document.getElementById('ps-material').value;
+  document.getElementById('modal-pin-setup').classList.remove('show');
+  _currentPinSetup=null; save(); renderPins();
+  setHint('Pin antippen zum Bearbeiten · Pin-Tool für neuen Pin');
+};
+document.getElementById('modal-ps-del').onclick = () => {
+  if(!_currentPinSetup) return;
+  const id = _currentPinSetup.id;
+  document.getElementById('modal-pin-setup').classList.remove('show');
+  pushHistory();
+  S.pins = S.pins.filter(p => p.id !== id);
+  _currentPinSetup=null; save(); renderPins();
+  setHint('Pin antippen zum Bearbeiten · Pin-Tool für neuen Pin');
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SCHRITT 4 — MESSUNGEN
+// ═══════════════════════════════════════════════════════════════════════════
+function onStep4Down(wp) {
+  if (S.tool && S.tool !== 'pan') return;
+  const hitPin=S.pins.find(p=>Math.hypot(p.x-wp.x,p.y-wp.y)<20);
+  if (hitPin) { openPinMessModal(hitPin); return; }
+  const hitB=S.bereiche.find(b=>pointInPoly(wp.x,wp.y,b.pts));
+  if (hitB) { openBereichMessModal(hitB); return; }
+}
+
+// ── Bereich Messung ──────────────────────────────────────────────────────────
+let _currentBM = null;
+function openBereichMessModal(b) {
+  _currentBM=b;
+  const ma=MESSAUFNAHMEN.find(m=>m.id===S.aktiveMA);
+  const name=(b.raum?b.raum+' / ':''+(b.bereichName||b.name||'Bereich'));
+  document.getElementById('bm-title').textContent=name;
+  document.getElementById('bm-ma-label').textContent=ma?.label||'';
+  const m=b.messungen?.[S.aktiveMA]||{};
+  document.getElementById('bm-temp').value=m.temp??'';
+  document.getElementById('bm-rh').value=m.rh??'';
+  document.getElementById('modal-bereich-mess').classList.add('show');
+  setTimeout(()=>document.getElementById('bm-temp').focus(),200);
+}
+document.getElementById('modal-bm-ok').onclick = () => {
+  if(!_currentBM) return;
+  const temp=document.getElementById('bm-temp').value;
+  const rh  =document.getElementById('bm-rh').value;
+  if(!_currentBM.messungen) _currentBM.messungen=emptyBereichMessungen();
+  _currentBM.messungen[S.aktiveMA]={
+    temp: temp!==''?parseFloat(temp):null,
+    rh:   rh!==''  ?parseFloat(rh)  :null,
+  };
+  document.getElementById('modal-bereich-mess').classList.remove('show');
+  _currentBM=null; save(); renderBereiche(); toast('Messung gespeichert ✓');
+};
+document.getElementById('modal-bm-cancel').onclick = () => {
+  document.getElementById('modal-bereich-mess').classList.remove('show'); _currentBM=null;
+};
+
+// ── Pin Messung ──────────────────────────────────────────────────────────────
+let _currentPM = null;
+function openPinMessModal(pin) {
+  _currentPM=pin;
+  const ma=MESSAUFNAHMEN.find(m=>m.id===S.aktiveMA);
+  document.getElementById('pm-title').textContent='Messpunkt '+pin.label;
+  document.getElementById('pm-info').textContent=[pin.verfahren,pin.material].filter(Boolean).join(' · ');
+  document.getElementById('pm-ma-label').textContent=ma?.label||'';
+  const m=pin.messungen?.[S.aktiveMA]||{};
+  document.getElementById('pm-digits').value=m.digits??'';
+  document.getElementById('modal-pin-mess').classList.add('show');
+  setTimeout(()=>document.getElementById('pm-digits').focus(),200);
+}
+document.getElementById('modal-pm-ok').onclick = () => {
+  if(!_currentPM) return;
+  const val=document.getElementById('pm-digits').value;
+  if(!_currentPM.messungen) _currentPM.messungen=emptyPinMessungen();
+  _currentPM.messungen[S.aktiveMA]={
+    digits: val!==''?Math.round(Math.max(0,Math.min(9999,parseFloat(val)))):null,
+  };
+  document.getElementById('modal-pin-mess').classList.remove('show');
+  _currentPM=null; save(); renderPins(); toast('Messung gespeichert ✓');
+};
+document.getElementById('modal-pm-cancel').onclick = () => {
+  document.getElementById('modal-pin-mess').classList.remove('show'); _currentPM=null;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TOOLBAR / MA-TABS
+// ═══════════════════════════════════════════════════════════════════════════
+function updateToolbar() {
+  const row    = document.getElementById('tool-row');
+  const topbar = document.getElementById('topbar');
+  const back   = document.getElementById('btn-back');
+  const nb     = document.getElementById('btn-next');
+  row.innerHTML = '';
+
+  // Nav-Bar immer sichtbar
+  document.getElementById('nav-bar').classList.add('visible');
+
+  // Zurück-Button
+  back.disabled = (S.step === 1);
+  back.textContent = '← Zurück';
+
+  // Weiter/Speichern-Button
+  if (S.step === 4) {
+    nb.className = 'nav-btn next'; nb.textContent = 'Projekt speichern';
+  } else if (S.step === 5) {
+    nb.className = 'nav-btn finish'; nb.textContent = '✓ Fertig';
+  } else {
+    nb.className = 'nav-btn next'; nb.textContent = 'Weiter →';
+  }
+
+  // Toolbar
+  if (S.step === 1 || S.step === 5) {
+    topbar.style.display = 'none';
+    return;
+  }
+  topbar.style.display = '';
+  row.className = 'tool-row';
+  for (const t of toolDefs()) {
+    const isActive = S.tool === t.id && !!t.id;
+    const btn = document.createElement('button');
+    btn.className = 'tool-btn'+(isActive?' active':'')+(isActive&&t.del?' del':'')+(t.cls&&!isActive?' '+t.cls:'')+(t.dim?' dim':'');
+    btn.innerHTML = `<span class="icon">${t.icon}</span><span>${t.label}</span>`;
+    btn.ontouchstart = ()=>{};
+    btn.onclick = ()=>{
+      if(t.action){t.action();return;}
+      S.tool = (S.tool===t.id) ? null : t.id;
+      if(['wall_outer','wall_inner'].includes(S.tool)&&S.grundriss.mode==='none'){S.grundriss.mode='drawing';renderBg();}
+      if(!S.tool){S.wip=null;renderUI();defaultHint();}
+      else setHint(t.hint||'');
+      updateToolbar();
+    };
+    row.appendChild(btn);
+  }
+}
+
+function fitBtn() {
+  return {id:'_fit', icon:'⊡', label:'Einpassen', hint:'Grundriss zentrieren und einpassen',
+    action:()=>{ fitScreen(); renderAll(); }};
+}
+
+function toolDefs() {
+  const undo  ={id:'_undo',  icon:'↩',label:'Rückgängig',dim:!_history.length,hint:'',action:undoLast};
+  const pan   ={id:'pan',    icon:'✋',label:'Pan',        hint:'Einen Finger ziehen zum Verschieben'};
+  const eraser={id:'eraser', icon:'🗑',label:'Löschen',   hint:'Element antippen zum Löschen',del:true};
+
+  if (S.step===2) {
+    const tools=[undo,pan,fitBtn()];
+    if (S.selectedElement) {
+      const lbl=S.selectedElement.type==='door'?'Tür':'Fenster';
+      tools.push(
+        {id:'_sm',icon:'−',label:lbl+' −',hint:'Breite verkleinern',action:()=>resizeElement(-20)},
+        {id:'_lg',icon:'+',label:lbl+' +',hint:'Breite vergrößern', action:()=>resizeElement(+20)},
+      );
+      if(S.selectedElement.type==='door')
+        tools.push({id:'_flip',icon:'↕',label:'Richtung',hint:'Türrichtung wählen (4 Varianten)',action:openVariantPicker});
+      tools.push({id:'_del',icon:'🗑',label:'Löschen',hint:'Element löschen',action:deleteSelectedElement});
+      return tools;
+    }
+    if (S.grundriss.mode==='none') {
+      tools.push(
+        {id:'_photo',    icon:'📷',label:'Foto',      hint:'Foto aufnehmen oder aus Galerie wählen',action:doPhotoUpload},
+        {id:'wall_outer',icon:'═', label:'Außenwand', hint:'Tippen: Startpunkt → Endpunkt · Doppeltippen: Wandkette beenden'},
+        {id:'wall_inner',icon:'─', label:'Innenwand', hint:'Tippen: Startpunkt → Endpunkt · Doppeltippen: Wandkette beenden'},
+      );
+    }
+    if (S.grundriss.mode==='drawing') {
+      tools.push(
+        {id:'select',    icon:'👆',label:'Auswahl',  hint:'Wand antippen für Tür/Fenster · Tür/Fenster antippen zum Bearbeiten'},
+        {id:'wall_outer',icon:'═', label:'Außenwand',hint:'Tippen: Startpunkt → Endpunkt · Doppeltippen: Wandkette beenden'},
+        {id:'wall_inner',icon:'─', label:'Innenwand', hint:'Tippen: Startpunkt → Endpunkt · Doppeltippen: Wandkette beenden'},
+      );
+      if(S.selectedWallId) tools.push(
+        {id:'door',  icon:'🚪',label:'Tür',    hint:'Auf die gewählte Wand tippen'},
+        {id:'window',icon:'▣', label:'Fenster',hint:'Auf die gewählte Wand tippen'},
+      );
+      if(S.wip?.type==='wall') tools.push(
+        {id:'_end',icon:'✅',label:'Beenden',hint:'Wandkette abschließen',cls:'accent',action:()=>{S.wip=null;renderUI();updateToolbar();defaultHint();}}
+      );
+      tools.push(
+        eraser,
+        {id:'_grid',icon:S.grundriss.showGrid?'▦':'□',label:S.grundriss.showGrid?'Gitter aus':'Gitter',hint:'Hilfsgitter ein/ausblenden',action:toggleGrid},
+        {id:'_toPhoto',icon:'📷',label:'Zu Foto',hint:'Wechsel zu Foto-Modus',action:()=>switchMode('photo')},
+      );
+    }
+    if (S.grundriss.mode==='photo') tools.push(
+      {id:'_rot',   icon:'🔄',label:'Drehen',  hint:'Foto 90° drehen',    action:rotatePhoto},
+      {id:'_toDraw',icon:'✏️', label:'Zeichnen',hint:'Wechsel zu Zeichen-Modus',action:()=>switchMode('drawing')},
+    );
+    return tools;
+  }
+  if (S.step===3) {
+    const tools=[undo,pan,fitBtn(),{id:'bereich',icon:'⬡',label:'Bereich',hint:'Punkt für Punkt tippen · auf ersten Punkt tippen zum Schließen'}];
+    if(S.wip?.type==='bereich'&&S.wip.pts?.length>=3)
+      tools.push({id:'_close',icon:'✅',label:'Schließen',hint:'Polygon schließen',cls:'accent',action:finishBereich});
+    tools.push(eraser);
+    return tools;
+  }
+  if (S.step===4) return [undo,pan,fitBtn(),
+    {id:'pin',icon:'📍',label:'Pin',hint:'Tippen zum Platzieren · ✓ zum Bestätigen'},
+    eraser,
+  ];
+  return [undo,pan];
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TÜRRICHTUNGS-PICKER
+// ═══════════════════════════════════════════════════════════════════════════
+function variantSVG(i, active) {
+  const configs=[
+    {hx:12,hy:24,dx:36,dy:24,ex:12,ey:48,sw:1},
+    {hx:12,hy:24,dx:36,dy:24,ex:12,ey:0, sw:0},
+    {hx:36,hy:24,dx:12,dy:24,ex:36,ey:48,sw:0},
+    {hx:36,hy:24,dx:12,dy:24,ex:36,ey:0, sw:1},
+  ];
+  const c=configs[i],col=active?'#f97316':'#ef4444',fill=active?'rgba(249,115,22,0.25)':'rgba(239,68,68,0.18)';
+  return `<svg width="52" height="48" viewBox="0 0 52 48" xmlns="http://www.w3.org/2000/svg">
+    <line x1="0" y1="24" x2="52" y2="24" stroke="#6b7280" stroke-width="3"/>
+    <path d="M${c.hx},${c.hy} L${c.dx},${c.dy} A24,24 0 0,${c.sw} ${c.ex},${c.ey} Z" fill="${fill}" stroke="${col}" stroke-width="1.5"/>
+    <circle cx="${c.hx}" cy="${c.hy}" r="3.5" fill="${col}"/>
+  </svg>`;
+}
+function openVariantPicker() {
+  const door=findElement('door',S.selectedElement.id);if(!door)return;
+  const curV=door.variant??0;
+  const grid=document.getElementById('variant-grid');
+  grid.innerHTML='';
+  DOOR_VARIANTS.forEach((v,i)=>{
+    const isActive=curV===i;
+    const btn=document.createElement('button');
+    btn.style.cssText='padding:8px 6px;border-radius:10px;border:2px solid '+(isActive?'#3b82f6':'#374151')+';background:'+(isActive?'#1e3a5f':'#111827')+';cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;width:100%;';
+    btn.innerHTML=variantSVG(i,isActive)+`<span style="font-size:11px;color:${isActive?'#93c5fd':'#9ca3af'}">${v.label}</span>`;
+    btn.onclick=()=>{ pushHistory();door.variant=i;renderDraw();save();document.getElementById('modal-variant').classList.remove('show'); };
+    grid.appendChild(btn);
+  });
+  document.getElementById('modal-variant').classList.add('show');
+}
+document.getElementById('modal-variant-cancel').onclick=()=>document.getElementById('modal-variant').classList.remove('show');
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FOTO + GITTER
+// ═══════════════════════════════════════════════════════════════════════════
+function doPhotoUpload() {
+  const inp=document.createElement('input');
+  inp.type='file';inp.accept='image/*';inp.capture='environment';
+  inp.onchange=e=>{
+    const file=e.target.files?.[0];if(!file)return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      S.grundriss.mode='photo';S.grundriss.photo={dataUrl:ev.target.result};
+      S.grundriss.photoRotation=0;S.tool=null;
+      renderBg();updateToolbar();
+      setHint('Pinch zum Zoomen · 🔄 Drehen · Bereiche und Pins im nächsten Schritt');
+    };
+    reader.readAsDataURL(file);
+  };
+  inp.click();
+}
+function rotatePhoto() { S.grundriss.photoRotation=((S.grundriss.photoRotation||0)+90)%360; renderBg(); }
+function toggleGrid()  { S.grundriss.showGrid=!S.grundriss.showGrid; renderBg(); updateToolbar(); }
+function switchMode(to) {
+  if(S.grundriss.mode===to)return;
+  showWarnModal('Grundrisstyp wechseln?\nBereiche und Messpunkte bleiben erhalten.',()=>{
+    S.grundriss={mode:to,photo:null,photoRotation:0,showGrid:false,walls:[],doors:[],windows:[]};
+    S.selectedWallId=null;S.selectedElement=null;S.wip=null;S.tool=null;
+    hideConfirmOverlay();
+    if(to==='photo')doPhotoUpload();
+    renderAll();updateToolbar();defaultHint();
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════════════════════════════
+function goToStep(n) {
+  if (S.step===1) saveStep4Fields();
+  if (S.step===2) { S.grundrissImg = captureGrundrissExport() || S.grundrissImg; }
+  S.step=n;S.tool=null;S.wip=null;S.selectedWallId=null;
+  S.selectedElement=null;S.draggingElement=false;S.pendingPin=null;
+  hideConfirmOverlay();
+  const isS1 = n===1, isS5 = n===5, isCanvas = n>=2 && n<=4;
+  document.getElementById('canvas-wrap').style.display = isCanvas ? '' : 'none';
+  document.getElementById('step4-wrap').style.display  = isS1 ? 'flex' : 'none';
+  document.getElementById('step5-wrap').style.display  = isS5 ? 'flex' : 'none';
+  if (isS1) renderStep4();
+  if (isS5) renderStep5();
+  updateStepHeader(); updateToolbar();
+  if (isCanvas) {
+    setTimeout(() => {
+      stage.width(container.clientWidth);
+      stage.height(container.clientHeight);
+      fitScreen(); renderAll(); defaultHint();
+    }, 30);
+  }
+}
+function updateStepHeader() {
+  [1,2,3,4].forEach(i=>{
+    const el = document.getElementById(`sn-${i}`);
+    if (el) el.className = 'sn-item' + (i===S.step?' active':i<S.step?' done':'');
+  });
+  // Step-Nav nur bei Schritten 1–4 sichtbar
+  const stepNav = document.getElementById('step-nav');
+  if (stepNav) stepNav.classList.toggle('hidden', S.step >= 5);
+  document.getElementById('step-title').textContent=
+    ['Projektdaten','Grundriss','Bereiche','Messpunkte','Projektdetails'][S.step-1];
+}
+
+document.getElementById('step-nav').addEventListener('click', e => {
+  const item = e.target.closest('.sn-item');
+  if (!item) return;
+  const n = parseInt(item.querySelector('.sn-dot').textContent);
+  if (n && n !== S.step) goToStep(n);
+});
+function defaultHint() {
+  const h=[
+    '',
+    'Werkzeug wählen oder Foto hochladen',
+    'Bereich-Tool wählen und Räume einzeichnen',
+    'Pin-Tool wählen und Messpunkte setzen',
+    '',
+  ];
+  setHint(h[S.step-1]||'');
+}
+document.getElementById('btn-back').onclick = () => {
+  if (S.step > 1) goToStep(S.step - 1);
+};
+
+document.getElementById('btn-next').onclick = () => {
+  if (S.step === 4) {
+    const job = _jobs.find(j => j.id === _activeJobId);
+    if (job) { job.savedThrough = 4; saveJobs(); }
+    goToStep(5);
+  } else if (S.step < 5) {
+    goToStep(S.step + 1);
+  } else {
+    save(); toast('Gespeichert ✓');
+  }
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MODALS
+// ═══════════════════════════════════════════════════════════════════════════
+document.getElementById('modal-projekt-cancel').onclick=()=>document.getElementById('modal-projekt').classList.remove('show');
+
+let _warnCb=null;
+function showWarnModal(text,cb){
+  _warnCb=cb;
+  document.getElementById('modal-warn-text').textContent=text;
+  document.getElementById('modal-warn').classList.add('show');
+}
+document.getElementById('modal-warn-ok').onclick=()=>{
+  document.getElementById('modal-warn').classList.remove('show');
+  if(_warnCb){_warnCb();_warnCb=null;}
+};
+document.getElementById('modal-warn-cancel').onclick=()=>{
+  document.getElementById('modal-warn').classList.remove('show');_warnCb=null;
+};
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TOAST + HINT
+// ═══════════════════════════════════════════════════════════════════════════
+let _toastT;
+function toast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.classList.add('show');
+  clearTimeout(_toastT);_toastT=setTimeout(()=>el.classList.remove('show'),2500);
+}
+function setHint(msg){ document.getElementById('hint').textContent=msg||''; }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STEP 5 — MESSUNGEN (Kartenfolge)
+// ═══════════════════════════════════════════════════════════════════════════
+const MA_SEQUENCE = [
+  { id:'sa',  label:'Schadensaufnahme', optional:false },
+  { id:'ab',  label:'Aufbau',           optional:false },
+  { id:'zm1', label:'Zwischenmessung 1',optional:true  },
+  { id:'zm2', label:'Zwischenmessung 2',optional:true  },
+  { id:'end', label:'Abbau',            optional:false },
+];
+
+function maVisible(id) {
+  const st = S.maStatus;
+  switch(id) {
+    case 'sa':  return true;
+    case 'ab':  return st.sa  === 'done';
+    case 'zm1': return st.ab  === 'done';
+    case 'zm2': return st.zm1 === 'done';
+    case 'end': return st.ab  === 'done';
+    default:    return false;
+  }
+}
+
+let _s5OpenCard = null;
+
+function renderStep5() {
+  const list = document.getElementById('s5-card-list');
+  list.innerHTML = MA_SEQUENCE
+    .filter(ma => maVisible(ma.id))
+    .map(ma => {
+      const status = S.maStatus[ma.id]; // 'pending'|'done'
+      const ts     = S.maDates[ma.id];
+      const isOpen = _s5OpenCard === ma.id;
+      return `
+        <div class="s5-card${ma.optional?' optional':''}${status==='done'?' done':' active'}" data-ma="${ma.id}">
+          <div class="s5-card-header" data-toggle="${ma.id}">
+            <div class="s5-status-dot"></div>
+            <div style="flex:1;min-width:0">
+              <span class="s5-card-label">${ma.label}</span>
+              ${ts ? `<div style="font-size:11px;color:#6b7280;margin-top:2px">${ts}</div>` : ''}
+            </div>
+            ${ma.optional ? '<span class="s5-badge-opt">Optional</span>' : ''}
+            <span class="s5-card-arrow">${isOpen ? '∨' : '›'}</span>
+          </div>
+          ${isOpen ? `
+          <div class="s5-card-footer" style="display:block">
+            <div class="s5-card-foot-hint">Messerfassung wird hier implementiert.</div>
+            <div class="s5-foot-btns">
+              ${status!=='done'
+                ? `<button class="s5-btn-done" data-finish="${ma.id}">✓ Abschließen</button>`
+                : `<button class="s5-btn-undo" data-undo="${ma.id}">Rückgängig</button>`
+              }
+            </div>
+          </div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+document.getElementById('s5-card-list').addEventListener('click', e => {
+  const card = e.target.closest('[data-ma]');
+  if (card) openMaOverlay(card.dataset.ma);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MA OVERLAY
+// ═══════════════════════════════════════════════════════════════════════════
+let _maId = null;      // aktuelle MA-ID im Overlay
+let _pinIdx = 0;       // aktueller Pin-Index
+let _maScreen = 'info'; // 'info' | 'bereiche' | 'pins' | 'trocken'
+
+function maSetFooter(backDisabled, backText, nextText, nextFinish) {
+  const back = document.getElementById('ma-btn-back');
+  const next = document.getElementById('ma-btn-next');
+  back.disabled = backDisabled;
+  back.textContent = backText;
+  next.textContent = nextText;
+  next.className = nextFinish ? 'finish' : '';
+}
+
+function openMaOverlay(maId) {
+  _maId = maId;
+  _maScreen = 'info';
+  const ma = MA_SEQUENCE.find(m => m.id === maId);
+  document.getElementById('ma-ov-title').textContent = ma ? ma.label : maId;
+
+  // Kopfdaten laden
+  const info = S.maInfo[maId] || {};
+  document.getElementById('ma-datum').value = info.datum || new Date().toISOString().slice(0,10);
+  fillSelect('ma-name',      _settings.techniker,  info.name       || '');
+  fillSelect('ma-messgeraet',_settings.messgeraet, info.messgeraet || '');
+
+  // Screens
+  document.getElementById('ma-screen-info').style.display = 'block';
+  document.getElementById('ma-screen-bereiche').style.display = 'none';
+  document.getElementById('ma-screen-pins').style.display = 'none';
+  document.getElementById('ma-screen-trocken').style.display = 'none';
+
+  // Footer-Buttons für Info-Screen
+  maSetFooter(true, '← Zurück', 'Weiter →', false);
+
+  document.getElementById('ma-overlay').classList.add('show');
+}
+
+function closeMaOverlay() {
+  document.getElementById('ma-overlay').classList.remove('show');
+  _maId = null;
+  // Nav-Bar auf Step-5-Zustand zurücksetzen
+  updateToolbar();
+}
+
+function saveMaInfo() {
+  if (!_maId) return;
+  S.maInfo[_maId] = {
+    datum:      document.getElementById('ma-datum').value,
+    name:       document.getElementById('ma-name').value,
+    messgeraet: document.getElementById('ma-messgeraet').value,
+  };
+}
+
+function showMaBereiche() {
+  saveMaInfo();
+  _maScreen = 'bereiche';
+  document.getElementById('ma-screen-info').style.display = 'none';
+  document.getElementById('ma-screen-bereiche').style.display = 'block';
+  renderMaBereiche();
+  maSetFooter(false, '← Aufnahmedaten', 'Weiter →', false);
+}
+
+function renderMaBereiche() {
+  const list = document.getElementById('ma-bereiche-list');
+  if (S.bereiche.length === 0) {
+    list.innerHTML = '<p style="color:#6b7280;font-size:13px;padding:10px 0">Keine Bereiche vorhanden.</p>';
+    return;
+  }
+  list.innerHTML = S.bereiche.map((b, i) => {
+    const m = b.messungen[_maId] || {};
+    const title = [b.raum, b.bereichName].filter(Boolean).join(' / ');
+    return `
+      <div class="ma-bereich-card">
+        <div class="ma-bereich-card-title">${escHtml(title)}</div>
+        <div class="ma-klima-row">
+          <div class="ma-klima-field">
+            <label>Temperatur</label>
+            <div class="ma-klima-input-wrap">
+              <input class="ma-klima-input" type="number" step="0.1"
+                data-bid="${escHtml(b.id)}" data-field="temp"
+                value="${m.temp !== null && m.temp !== undefined ? m.temp : ''}"
+                placeholder="–">
+              <span class="ma-klima-unit">°C</span>
+            </div>
+          </div>
+          <div class="ma-klima-field">
+            <label>Luftfeuchte</label>
+            <div class="ma-klima-input-wrap">
+              <input class="ma-klima-input" type="number" step="0.1"
+                data-bid="${escHtml(b.id)}" data-field="rh"
+                value="${m.rh !== null && m.rh !== undefined ? m.rh : ''}"
+                placeholder="–">
+              <span class="ma-klima-unit">%</span>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function saveMaBereiche() {
+  if (!_maId) return;
+  document.querySelectorAll('#ma-bereiche-list .ma-klima-input').forEach(inp => {
+    const bid = inp.dataset.bid;
+    const field = inp.dataset.field;
+    const b = S.bereiche.find(b => b.id === bid);
+    if (!b) return;
+    if (!b.messungen[_maId]) b.messungen[_maId] = { temp: null, rh: null };
+    const val = inp.value;
+    b.messungen[_maId][field] = val !== '' ? parseFloat(val) : null;
+  });
+}
+
+function showMaPins() {
+  saveMaBereiche();
+  _maScreen = 'pins';
+  _pinIdx = 0;
+  document.getElementById('ma-screen-bereiche').style.display = 'none';
+  document.getElementById('ma-screen-pins').style.display = 'block';
+  renderMaPin();
+}
+
+function renderMaPin() {
+  const pins = S.pins;
+  if (pins.length === 0) {
+    closeMaOverlay();
+    toast('Keine Messpunkte vorhanden — bitte zuerst Schritt 4 abschließen.');
+    return;
+  }
+  const pin = pins[_pinIdx];
+
+  // Progress-Dots
+  const dots = document.getElementById('ma-progress-dots');
+  dots.innerHTML = pins.map((p, i) => {
+    const val = p.messungen[_maId]?.digits;
+    const cls = i === _pinIdx ? 'current' : (val !== null && val !== undefined && val !== '') ? 'filled' : '';
+    return `<div class="ma-prog-dot ${cls}"></div>`;
+  }).join('');
+
+  // Pin-Info
+  document.getElementById('ma-pin-nr').textContent = `Messpunkt ${_pinIdx+1} / ${pins.length}`;
+  document.getElementById('ma-pin-label').textContent = `MP ${pin.label}`;
+
+  const bereich = S.bereiche.find(b => b.id === pin.bereichId);
+  document.getElementById('ma-pin-bereich').textContent =
+    bereich ? `${bereich.raum ? bereich.raum + ' / ' : ''}${bereich.bereichName}` : '';
+  document.getElementById('ma-pin-meta').textContent =
+    [pin.verfahren, pin.material].filter(Boolean).join(' · ');
+  // Klima aus dem zugehörigen Bereich anzeigen
+  const klimaEl = document.getElementById('ma-pin-klima');
+  if (bereich && bereich.messungen[_maId]) {
+    const km = bereich.messungen[_maId];
+    const parts = [];
+    if (km.temp !== null && km.temp !== undefined) parts.push(`${km.temp} °C`);
+    if (km.rh   !== null && km.rh   !== undefined) parts.push(`${km.rh} %`);
+    if (parts.length > 0) {
+      klimaEl.textContent = '🌡 ' + parts.join(' · ');
+      klimaEl.style.display = 'block';
+    } else {
+      klimaEl.style.display = 'none';
+    }
+  } else {
+    klimaEl.style.display = 'none';
+  }
+
+  // Gespeicherten Wert laden
+  const existing = pin.messungen[_maId]?.digits;
+  document.getElementById('ma-digits').value = (existing !== null && existing !== undefined) ? existing : '';
+  setTimeout(() => document.getElementById('ma-digits').focus(), 100);
+
+  // Footer-Buttons — letzter Pin führt zu Trocknungs-Screen
+  maSetFooter(false,
+    _pinIdx === 0 ? '← Aufnahmedaten' : '← Zurück',
+    'Weiter →',
+    false
+  );
+}
+
+function saveMaDigit() {
+  if (!_maId || S.pins.length === 0) return;
+  const pin = S.pins[_pinIdx];
+  if (!pin.messungen[_maId]) pin.messungen[_maId] = { digits: null };
+  const val = document.getElementById('ma-digits').value;
+  pin.messungen[_maId].digits = val !== '' ? parseFloat(val) : null;
+}
+
+function showMaTrocken() {
+  saveMaDigit();
+  _maScreen = 'trocken';
+  document.getElementById('ma-screen-pins').style.display = 'none';
+  document.getElementById('ma-screen-trocken').style.display = 'block';
+  renderTrocken();
+  maSetFooter(false, '← Zurück', '✓ Abschließen', true);
+}
+
+function renderTrocken() {
+  const saved = S.maInfo[_maId]?.trocken || {};
+  // Radio-Karten zurücksetzen
+  document.querySelectorAll('.tr-card').forEach(c => c.classList.remove('selected'));
+  // Gespeicherten Wert wiederherstellen
+  if (saved.wahl) {
+    const card = document.querySelector(`.tr-card[data-val="${saved.wahl}"]`);
+    if (card) {
+      card.classList.add('selected');
+      const extra = card.querySelector('.tr-extra-input');
+      if (extra) { extra.style.display = 'block'; extra.value = saved.extraVal || ''; }
+    }
+  }
+  // Extras der nicht-gewählten Karten ausblenden
+  document.querySelectorAll('.tr-card:not(.selected) .tr-extra-input').forEach(e => {
+    e.style.display = 'none'; e.value = '';
+  });
+  document.getElementById('tr-bemerkungen').value = saved.bemerkungen || '';
+}
+
+function saveMaTrocken() {
+  if (!_maId) return;
+  const selected = document.querySelector('.tr-card.selected');
+  const wahl = selected ? selected.dataset.val : null;
+  let extraVal = '';
+  if (wahl === 'erfolgreich') extraVal = document.getElementById('tr-datum').value;
+  if (wahl === 'abgebrochen') extraVal = document.getElementById('tr-grund').value;
+  if (!S.maInfo[_maId]) S.maInfo[_maId] = {};
+  S.maInfo[_maId].trocken = {
+    wahl,
+    extraVal,
+    bemerkungen: document.getElementById('tr-bemerkungen').value,
+  };
+}
+
+function maOverlayFinish() {
+  saveMaTrocken();
+  S.maStatus[_maId] = 'done';
+  const now = new Date();
+  S.maDates[_maId] = now.toLocaleString('de-DE', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+  save();
+  closeMaOverlay();
+  renderStep5();
+}
+
+document.getElementById('ma-ov-close').addEventListener('click', () => {
+  if (_maScreen === 'pins') saveMaDigit();
+  else if (_maScreen === 'bereiche') saveMaBereiche();
+  else if (_maScreen === 'trocken') saveMaTrocken();
+  else saveMaInfo();
+  save(); closeMaOverlay();
+});
+
+document.getElementById('ma-btn-back').addEventListener('click', () => {
+  if (_maScreen === 'trocken') {
+    saveMaTrocken();
+    _maScreen = 'pins';
+    document.getElementById('ma-screen-trocken').style.display = 'none';
+    document.getElementById('ma-screen-pins').style.display = 'block';
+    _pinIdx = S.pins.length - 1;
+    renderMaPin();
+  } else if (_maScreen === 'pins') {
+    saveMaDigit();
+    if (_pinIdx === 0) {
+      // zurück zu Bereiche
+      _maScreen = 'bereiche';
+      document.getElementById('ma-screen-pins').style.display = 'none';
+      document.getElementById('ma-screen-bereiche').style.display = 'block';
+      renderMaBereiche();
+      maSetFooter(false, '← Aufnahmedaten', 'Weiter →', false);
+    } else {
+      _pinIdx--;
+      renderMaPin();
+    }
+  } else if (_maScreen === 'bereiche') {
+    saveMaBereiche();
+    _maScreen = 'info';
+    document.getElementById('ma-screen-bereiche').style.display = 'none';
+    document.getElementById('ma-screen-info').style.display = 'block';
+    maSetFooter(true, '← Zurück', 'Weiter →', false);
+  }
+});
+
+document.getElementById('ma-btn-next').addEventListener('click', () => {
+  if (_maScreen === 'info') {
+    showMaBereiche();
+  } else if (_maScreen === 'bereiche') {
+    showMaPins();
+  } else if (_maScreen === 'pins') {
+    saveMaDigit();
+    if (_pinIdx < S.pins.length - 1) {
+      _pinIdx++;
+      renderMaPin();
+    } else {
+      showMaTrocken();
+    }
+  } else if (_maScreen === 'trocken') {
+    maOverlayFinish();
+  }
+});
+
+// Trocknung-Karten: Antippen zum Auswählen
+document.getElementById('ma-screen-trocken').addEventListener('click', e => {
+  const card = e.target.closest('.tr-card');
+  if (!card) return;
+  // Alle abwählen
+  document.querySelectorAll('.tr-card').forEach(c => {
+    c.classList.remove('selected');
+    const ex = c.querySelector('.tr-extra-input');
+    if (ex) ex.style.display = 'none';
+  });
+  // Diese Karte wählen
+  card.classList.add('selected');
+  const extra = card.querySelector('.tr-extra-input');
+  if (extra) {
+    extra.style.display = 'block';
+    setTimeout(() => extra.focus(), 50);
+  }
+});
+
+document.getElementById('s5-back-btn').addEventListener('click', () => goToStep(4));
+document.getElementById('s5-report-btn').addEventListener('click', generateReport);
+
+const LOGO_B64 = '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';
+
+function captureGrundrissExport() {
+  if (!S.grundriss.walls.length && !S.grundriss.photo) return null;
+  try {
+    // 1. Inhaltsgrenzen in Zeichnungskoordinaten ermitteln
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const addPt = (x, y) => {
+      if (!isFinite(x) || !isFinite(y)) return;
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    };
+    S.grundriss.walls.forEach(w => { addPt(w.x1, w.y1); addPt(w.x2, w.y2); });
+    S.bereiche.forEach(b => { if (b.pts) b.pts.forEach(p => addPt(p.x, p.y)); });
+    S.pins.forEach(p => addPt(p.x, p.y));
+    if (!isFinite(minX)) { minX = 0; minY = 0; maxX = W; maxY = H; }
+
+    const PAD = 60;
+    minX = Math.max(0, minX - PAD); minY = Math.max(0, minY - PAD);
+    maxX = Math.min(W, maxX + PAD); maxY = Math.min(H, maxY + PAD);
+    const cW = maxX - minX, cH = maxY - minY;
+
+    // 2. Export-Auflösung (A5 Landscape ca. 210×148mm @~150dpi = 1240×876, ×1.3 für Qualität)
+    const EXW = 1600, EXH = 1120;
+    const sc = Math.min(EXW / cW, EXH / cH) * 0.9;
+    const px = (EXW - cW * sc) / 2 - minX * sc;
+    const py = (EXH - cH * sc) / 2 - minY * sc;
+
+    // 3. Stage-Status sichern
+    const [oW, oH, oSx, oSy, oPx, oPy] = [
+      stage.width(), stage.height(), stage.scaleX(), stage.scaleY(), stage.x(), stage.y()
+    ];
+
+    // 4. Stage für Export konfigurieren
+    stage.width(EXW); stage.height(EXH);
+    stage.scale({ x: sc, y: sc });
+    stage.position({ x: px, y: py });
+    renderBg(); renderDraw(); renderBereiche(); renderPins();
+
+    // 5. Weiße Leinwand aufbauen + Layer zusammensetzen
+    const out = document.createElement('canvas');
+    out.width = EXW; out.height = EXH;
+    const ctx = out.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, EXW, EXH);
+    [bgLayer, drawLayer, bereichLayer, pinLayer].forEach(lay => {
+      try { ctx.drawImage(lay.getCanvas()._canvas, 0, 0); } catch(_) {}
+    });
+
+    // 6. Pin-Labels neu in Dunkel zeichnen (Original-Text ist #fff → unsichtbar auf Weiß)
+    const fontSize = Math.max(11, Math.round(13 * sc));
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textAlign = 'center';
+    S.pins.forEach(p => {
+      const sx = p.x * sc + px;
+      const sy = (p.y + 20) * sc + py;  // 20px unterhalb des Pin-Kreises
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 3;
+      ctx.strokeText(p.label, sx, sy);
+      ctx.fillStyle = '#111111';
+      ctx.fillText(p.label, sx, sy);
+    });
+
+    const dataUrl = out.toDataURL('image/jpeg', 0.85);
+
+    // 7. Stage wiederherstellen
+    stage.width(oW); stage.height(oH);
+    stage.scale({ x: oSx, y: oSy });
+    stage.position({ x: oPx, y: oPy });
+    renderAll();
+
+    return dataUrl;
+  } catch(e) { console.error('captureGrundrissExport', e); return null; }
+}
+
+function generateReport() {
+  saveCurrentJob();
+  const proj = S.projekt;
+  const MAS = MA_SEQUENCE;
+
+  // ── Hilfsfunktionen ────────────────────────────────
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function fmtDigit(v) {
+    return (v !== null && v !== undefined && v !== '') ? String(v) : '–';
+  }
+  function fmtKlima(m) {
+    if (!m) return '';
+    const t = (m.temp !== null && m.temp !== undefined) ? m.temp + ' °C' : '';
+    const r = (m.rh   !== null && m.rh   !== undefined) ? m.rh   + ' %' : '';
+    return [t, r].filter(Boolean).join(' / ');
+  }
+
+  // ── Grundriss-Snapshot nachholen falls noch nicht vorhanden ──
+  if (!S.grundrissImg) S.grundrissImg = captureGrundrissExport();
+
+  // ── Sichtbare Messaufnahmen ─────────────────────────
+  const visibleMas = MAS.filter(ma => S.maStatus[ma.id] === 'done' || S.maStatus[ma.id] === 'pending');
+
+  // ── Messtabelle HTML ────────────────────────────────
+  function buildMesTabelle(pins, startNr) {
+    if (pins.length === 0) return '<p style="color:#888">Keine Messpunkte.</p>';
+
+    let th = '<tr><th rowspan="4">MP</th><th rowspan="4">Verf.</th><th rowspan="4">Material</th><th rowspan="4">Bereich</th><th rowspan="4">Raum</th>';
+    visibleMas.forEach(ma => { th += `<th colspan="1">${esc(ma.label)}</th>`; });
+    th += '</tr>';
+
+    let tr_datum = '<tr>';
+    let tr_name  = '<tr>';
+    let tr_mg    = '<tr>';
+    visibleMas.forEach(ma => {
+      const info = S.maInfo[ma.id] || {};
+      tr_datum += `<th>${esc(info.datum || '')}</th>`;
+      tr_name  += `<th>${esc(info.name  || '')}</th>`;
+      tr_mg    += `<th>${esc(info.messgeraet || '')}</th>`;
+    });
+    tr_datum += '</tr>'; tr_name += '</tr>'; tr_mg += '</tr>';
+
+    let rows = '';
+    pins.forEach((pin, idx) => {
+      const b = S.bereiche.find(b => b.id === pin.bereichId);
+      const bereichName = b ? (b.bereichName || '') : '';
+      const raum = b ? (b.raum || '') : '';
+      let row = `<tr>
+        <td>${startNr + idx}</td>
+        <td>${esc(pin.verfahren)}</td>
+        <td>${esc(pin.material)}</td>
+        <td>${esc(bereichName)}</td>
+        <td>${esc(raum)}</td>`;
+      visibleMas.forEach(ma => {
+        const digits = pin.messungen?.[ma.id]?.digits;
+        row += `<td>${fmtDigit(digits)}</td>`;
+      });
+      row += '</tr>';
+      rows += row;
+    });
+
+    return `<table>
+      <thead>${th}${tr_datum}${tr_name}${tr_mg}</thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
+  // ── Raumklima-Tabelle ───────────────────────────────
+  function buildKlimaTabelle() {
+    if (S.bereiche.length === 0) return '';
+    let th = '<tr><th>Raum</th><th>Bereich</th>';
+    visibleMas.forEach(ma => { th += `<th colspan="2">${esc(ma.label)}</th>`; });
+    th += '</tr><tr><th></th><th></th>';
+    visibleMas.forEach(() => { th += '<th>°C</th><th>%</th>'; });
+    th += '</tr>';
+
+    let rows = '';
+    S.bereiche.forEach(b => {
+      let row = `<tr><td>${esc(b.raum || '')}</td><td>${esc(b.bereichName || '')}</td>`;
+      visibleMas.forEach(ma => {
+        const m = b.messungen?.[ma.id] || {};
+        row += `<td>${m.temp !== null && m.temp !== undefined ? m.temp : '–'}</td>`;
+        row += `<td>${m.rh   !== null && m.rh   !== undefined ? m.rh   : '–'}</td>`;
+      });
+      row += '</tr>';
+      rows += row;
+    });
+    return `<h3>Raumklima</h3><table><thead>${th}</thead><tbody>${rows}</tbody></table>`;
+  }
+
+  // ── Trocknung-Abschnitt ─────────────────────────────
+  function buildTrocknung() {
+    const t = S.maInfo?.sa?.trocken || {};
+    const labels = {
+      notwendig:      'Bezogen auf die erste Messung ist eine Trocknung notwendig',
+      nicht_notwendig:'Trocknung nicht notwendig',
+      erfolgreich:    'Die Trocknung wurde erfolgreich abgeschlossen am',
+      abgebrochen:    'Die Trocknung wurde abgebrochen weil',
+    };
+    let html = '<h3>Trocknung</h3><table><tbody>';
+    Object.entries(labels).forEach(([val, label]) => {
+      const checked = t.wahl === val;
+      let extra = '';
+      if (checked && val === 'erfolgreich' && t.extraVal) extra = ` <b>${esc(t.extraVal)}</b>`;
+      if (checked && val === 'abgebrochen'  && t.extraVal) extra = ` <b>${esc(t.extraVal)}</b>`;
+      html += `<tr>
+        <td style="width:20px;text-align:center">${checked ? '☑' : '☐'}</td>
+        <td>${esc(label)}${extra}</td>
+      </tr>`;
+    });
+    if (t.bemerkungen) {
+      html += `<tr><td colspan="2"><b>Bemerkungen:</b> ${esc(t.bemerkungen)}</td></tr>`;
+    }
+    html += '</tbody></table>';
+    return html;
+  }
+
+  // ── Grundriss-Seite ─────────────────────────────────
+  const PAGE_HEADER = `
+    <div class="page-header">
+      <img src="data:image/jpeg;base64,${LOGO_B64}" class="logo" alt="Logo">
+      <div class="hdr-info">
+        <div class="company">MeGra Trocknung GbR</div>
+        <div class="meta-row"><b>Bauvorhaben:</b> ${esc(proj.bauvorhaben)} &nbsp;&nbsp; <b>KV-Nr.:</b> ${esc(proj.kvNummer)}</div>
+        <div class="meta-row"><b>Auftraggeber:</b> ${esc(proj.auftraggeber)} &nbsp;&nbsp; <b>Datum:</b> ${esc(proj.datum)}</div>
+      </div>
+    </div>`;
+
+  let grundrissPageHtml = '';
+  if (S.grundrissImg) {
+    grundrissPageHtml = `
+      <div class="page">
+        ${PAGE_HEADER}
+        <h3>Grundriss</h3>
+        <div class="grundriss-section">
+          <img src="${S.grundrissImg}" alt="Grundriss">
+          <div class="grundriss-caption">Grundriss – ${esc(proj.bauvorhaben)}</div>
+        </div>
+      </div>
+      <div class="page-break"></div>`;
+  }
+
+  // ── Pins in Seiten à 30 aufteilen ──────────────────
+  const PAGE_SIZE = 30;
+  let pageHtml = '';
+  for (let i = 0; i < Math.max(1, S.pins.length); i += PAGE_SIZE) {
+    const chunk = S.pins.slice(i, i + PAGE_SIZE);
+    pageHtml += `
+      <div class="page">
+        ${PAGE_HEADER}
+        <h3>Messbericht${S.pins.length > PAGE_SIZE ? ' – Seite ' + (Math.floor(i/PAGE_SIZE)+1) : ''}</h3>
+        ${buildMesTabelle(chunk, i + 1)}
+        ${i === 0 ? buildKlimaTabelle() : ''}
+        ${i === 0 ? buildTrocknung() : ''}
+      </div>
+      ${i + PAGE_SIZE < S.pins.length ? '<div class="page-break"></div>' : ''}`;
+  }
+
+  // ── Vollständiges Dokument ──────────────────────────
+  const html = `<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Messbericht – ${esc(proj.bauvorhaben || 'Projekt')}</title>
+  <style>
+    @page { size: A4 landscape; margin: 12mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 8.5px; color: #000; background: #fff; }
+    .page { padding: 0; }
+    .page-break { page-break-after: always; }
+    .page-header { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 8px; border-bottom: 2px solid #c00; padding-bottom: 6px; }
+    .logo { height: 52px; width: auto; }
+    .hdr-info { flex: 1; }
+    .company { font-size: 13px; font-weight: bold; color: #c00; margin-bottom: 3px; }
+    .meta-row { font-size: 8.5px; margin-bottom: 1px; }
+    h3 { font-size: 10px; font-weight: bold; margin: 8px 0 4px; text-transform: uppercase; letter-spacing: .5px; color: #333; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 8px; }
+    th, td { border: 1px solid #bbb; padding: 2px 4px; text-align: center; }
+    thead th { background: #e8e8e8; font-weight: bold; font-size: 7.5px; }
+    tbody tr:nth-child(even) { background: #f9f9f9; }
+    td:nth-child(4), td:nth-child(5) { text-align: left; }
+    .grundriss-section { text-align: center; margin: 12px 0 8px; }
+    .grundriss-section img { max-width: 210mm; max-height: 130mm; width: auto; height: auto; border: 1px solid #ccc; }
+    .grundriss-caption { font-size: 7px; color: #888; margin-top: 4px; }
+    @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+  </style>
+</head>
+<body>
+  ${grundrissPageHtml}${pageHtml}
+  <script>window.onload=()=>window.print();<\/script>
+</body>
+</html>`;
+
+  const w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); }
+  else toast('Popup-Fenster blockiert – bitte Popup-Blocker deaktivieren.');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// STEP 4 — PROJEKTDETAILS
+// ═══════════════════════════════════════════════════════════════════════════
+const SETTINGS_DEFAULTS = {
+  techniker:  ['Max Mustermann', 'Lisa Müller', 'Tom Weber'],
+  verfahren:  ['WI', 'KA'],
+  material:   ['Estrich', 'Parkett', 'Fliesen', 'Beton', 'Mauerwerk', 'Holz', 'Putz'],
+  raum:       ['Wohnzimmer', 'Schlafzimmer', 'Bad', 'Küche', 'Flur', 'Keller', 'Dachboden'],
+  bereich:    ['Außenwand Nord', 'Außenwand Süd', 'Außenwand Ost', 'Außenwand West', 'Boden', 'Decke', 'Innenwand'],
+  messgeraet: ['Gann Hydromette RTU 600', 'Trotec T660', 'Flir MR277', 'Protimeter MMS3'],
+};
+
+let _settings = { techniker:[], verfahren:[], material:[], raum:[], bereich:[] };
+
+function saveSettings() {
+  try { localStorage.setItem('mb_v4_settings', JSON.stringify(_settings)); } catch(_) {}
+}
+function loadSettings() {
+  try {
+    const r = localStorage.getItem('mb_v4_settings');
+    if (r) {
+      _settings = { ...SETTINGS_DEFAULTS, ...JSON.parse(r) };
+    } else {
+      // Erste Nutzung: Beispielwerte laden. Alte Techniker-Liste migrieren.
+      _settings = JSON.parse(JSON.stringify(SETTINGS_DEFAULTS));
+      const oldTech = localStorage.getItem('mb_v4_tech');
+      if (oldTech) {
+        try { const arr = JSON.parse(oldTech); if (Array.isArray(arr) && arr.length) _settings.techniker = arr; } catch(_) {}
+      }
+      saveSettings();
+    }
+  } catch(_) { _settings = JSON.parse(JSON.stringify(SETTINGS_DEFAULTS)); }
+}
+
+function fillSelect(id, list, currentVal) {
+  const sel = document.getElementById(id);
+  if (!sel) return;
+  const vals = currentVal && !list.includes(currentVal) ? [currentVal, ...list] : list;
+  sel.innerHTML = vals.map(v => `<option value="${escHtml(v)}"${v===currentVal?' selected':''}>${escHtml(v)}</option>`).join('');
+}
+
+function updateAllDataLists() {
+  fillSelect('s4-techniker', _settings.techniker, S.projekt?.techniker || '');
+  fillSelect('ps-verfahren',  _settings.verfahren,  '');
+  fillSelect('ps-material',   _settings.material,   '');
+  fillSelect('bs-raum',       _settings.raum,       '');
+  fillSelect('bs-bereich',    _settings.bereich,    '');
+}
+
+const SETTINGS_META = [
+  { key:'techniker', label:'Techniker',   placeholder:'Name hinzufügen' },
+  { key:'verfahren', label:'Verfahren',   placeholder:'z.B. WI' },
+  { key:'material',  label:'Material',    placeholder:'z.B. Estrich' },
+  { key:'raum',      label:'Raum',        placeholder:'z.B. Wohnzimmer' },
+  { key:'bereich',   label:'Bereich',     placeholder:'z.B. Außenwand Nord' },
+  { key:'messgeraet',label:'Messgerät',   placeholder:'z.B. Gann Hydromette' },
+];
+
+function renderSettingsSheet() {
+  const scroll = document.getElementById('settings-scroll');
+  scroll.innerHTML = SETTINGS_META.map(m => `
+    <div class="settings-section" data-section="${m.key}">
+      <div class="settings-section-title">${m.label}</div>
+      <div class="settings-item-list" id="slist-${m.key}">
+        ${_settings[m.key].map(v => `
+          <div class="settings-item">
+            <span>${escHtml(v)}</span>
+            <button class="settings-rm" data-key="${m.key}" data-val="${escHtml(v)}">✕</button>
+          </div>`).join('')}
+      </div>
+      <div class="settings-add-row">
+        <input type="text" id="sadd-${m.key}" placeholder="${m.placeholder}" autocomplete="off" autocorrect="off" spellcheck="false">
+        <button class="settings-add-btn" data-add="${m.key}">+</button>
+      </div>
+    </div>`).join('');
+}
+
+function openSettings() {
+  renderSettingsSheet();
+  document.getElementById('sheet-settings').classList.add('show');
+}
+
+document.getElementById('settings-close').addEventListener('click', () => {
+  document.getElementById('sheet-settings').classList.remove('show');
+  updateAllDataLists();
+});
+document.getElementById('sheet-settings').addEventListener('click', e => {
+  if (e.target === document.getElementById('sheet-settings'))
+    document.getElementById('settings-close').click();
+  const rm = e.target.closest('[data-key][data-val]');
+  if (rm) {
+    const k = rm.dataset.key, v = rm.dataset.val;
+    _settings[k] = _settings[k].filter(x => x !== v);
+    saveSettings(); renderSettingsSheet(); return;
+  }
+  const addBtn = e.target.closest('[data-add]');
+  if (addBtn) {
+    const k = addBtn.dataset.add;
+    const inp = document.getElementById(`sadd-${k}`);
+    const val = inp.value.trim();
+    if (val && !_settings[k].includes(val)) { _settings[k].push(val); saveSettings(); renderSettingsSheet(); }
+    inp.value = ''; inp.focus(); return;
+  }
+});
+document.getElementById('settings-scroll').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const inp = e.target.closest('[id^="sadd-"]');
+  if (inp) {
+    const k = inp.id.replace('sadd-','');
+    const val = inp.value.trim();
+    if (val && !_settings[k].includes(val)) { _settings[k].push(val); saveSettings(); renderSettingsSheet(); }
+    inp.value = ''; return;
+  }
+});
+
+document.getElementById('btn-projekt').onclick = () => openSettings();
+document.getElementById('btn-settings-db').addEventListener('click', () => openSettings());
+
+function renderStep4() {
+  document.getElementById('s4-bauvorhaben').value  = S.projekt.bauvorhaben  || '';
+  document.getElementById('s4-auftraggeber').value = S.projekt.auftraggeber || '';
+  document.getElementById('s4-kvnummer').value     = S.projekt.kvNummer     || '';
+  fillSelect('s4-techniker', _settings.techniker, S.projekt.techniker || '');
+  document.getElementById('s4-datum').value        = S.projekt.datum        ||
+    new Date().toISOString().slice(0,10);
+}
+
+function saveStep4Fields() {
+  S.projekt.bauvorhaben  = document.getElementById('s4-bauvorhaben').value.trim();
+  S.projekt.auftraggeber = document.getElementById('s4-auftraggeber').value.trim();
+  S.projekt.kvNummer     = document.getElementById('s4-kvnummer').value.trim();
+  S.projekt.techniker    = document.getElementById('s4-techniker').value.trim();
+  S.projekt.datum        = document.getElementById('s4-datum').value;
+  save();
+}
+
+// Modals: außerhalb klicken schließt das Modal
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) {
+      overlay.classList.remove('show');
+      if (overlay.id === 'modal-warn') { _warnCb = null; }
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DASHBOARD / JOBS
+// ═══════════════════════════════════════════════════════════════════════════
+let _jobs = [];
+let _activeJobId = null;
+
+function saveJobs() {
+  try { localStorage.setItem('mb_v4_jobs', JSON.stringify(_jobs)); } catch(_) {}
+}
+
+function loadJobs() {
+  try {
+    const raw = localStorage.getItem('mb_v4_jobs');
+    if (raw) { _jobs = JSON.parse(raw); return; }
+    // Migrate from old mb_v4 single-project key
+    const old = localStorage.getItem('mb_v4');
+    if (old) {
+      const d = JSON.parse(old);
+      if (d.proj && d.proj.bauvorhaben) {
+        _jobs = [{ id: uid(), bauvorhaben: d.proj.bauvorhaben,
+          auftraggeber: d.proj.auftraggeber||'', kvNummer: d.proj.kvNummer||'',
+          status: 'aktiv', data: { g: d.g, b: d.b, p: d.p, ma: d.ma } }];
+        saveJobs();
+      }
+    }
+  } catch(_) {}
+}
+
+function saveCurrentJob() {
+  if (!_activeJobId) return;
+  const job = _jobs.find(j => j.id === _activeJobId);
+  if (!job) return;
+  job.bauvorhaben  = S.projekt.bauvorhaben;
+  job.auftraggeber = S.projekt.auftraggeber;
+  job.kvNummer     = S.projekt.kvNummer;
+  job.data = {
+    g: S.grundriss, b: S.bereiche, p: S.pins, ma: S.aktiveMA,
+    tech: S.projekt.techniker, datum: S.projekt.datum,
+    savedThrough: job.savedThrough || 0,
+    maStatus: S.maStatus,
+    maDates:  S.maDates,
+    maInfo:   S.maInfo,
+    grundrissImg: S.grundrissImg || null,
+  };
+  saveJobs();
+}
+
+function openJob(id) {
+  const job = _jobs.find(j => j.id === id);
+  if (!job) return;
+  _activeJobId = id;
+  job.status = 'aktiv';
+  const d = job.data || {};
+  S.projekt = {
+    bauvorhaben: job.bauvorhaben, auftraggeber: job.auftraggeber, kvNummer: job.kvNummer,
+    techniker: d.tech || '', datum: d.datum || '',
+  };
+  S.grundriss = d.g
+    ? { mode:'none', photo:null, photoRotation:0, showGrid:false, walls:[], doors:[], windows:[], ...d.g }
+    : { mode:'none', photo:null, photoRotation:0, showGrid:false, walls:[], doors:[], windows:[] };
+  S.bereiche  = (d.b||[]).map(b => ({ ...b, messungen: b.messungen || emptyBereichMessungen() }));
+  S.pins      = (d.p||[]).map(p => ({ ...p, messungen: p.messungen || emptyPinMessungen() }));
+  S.aktiveMA  = d.ma || 'sa';
+  S.maStatus  = d.maStatus
+    ? { sa:'pending', ab:'pending', zm1:'pending', zm2:'pending', end:'pending', ...d.maStatus }
+    : { sa:'pending', ab:'pending', zm1:'pending', zm2:'pending', end:'pending' };
+  S.maDates   = d.maDates
+    ? { sa:null, ab:null, zm1:null, zm2:null, end:null, ...d.maDates }
+    : { sa:null, ab:null, zm1:null, zm2:null, end:null };
+  const emptyInfo = ()=>({datum:'',name:'',messgeraet:''});
+  S.maInfo    = d.maInfo
+    ? { sa:emptyInfo(), ab:emptyInfo(), zm1:emptyInfo(), zm2:emptyInfo(), end:emptyInfo(), ...d.maInfo }
+    : { sa:emptyInfo(), ab:emptyInfo(), zm1:emptyInfo(), zm2:emptyInfo(), end:emptyInfo() };
+  S.grundrissImg = d.grundrissImg || null;
+  S.tool = null; S.wip = null; S.selectedWallId = null;
+  S.selectedElement = null; S.draggingElement = false; S.pendingPin = null;
+  // Einstiegspunkt: Step 5 (Projektdetails) wenn gespeichert, sonst Step 1 (Projektdaten)
+  S.step = (job.savedThrough >= 4) ? 5 : 1;
+  saveJobs();
+  showApp(false);
+}
+
+function backToDashboard() {
+  if (S.step === 1) saveStep4Fields();
+  saveCurrentJob();
+  _activeJobId = null;
+  // Reset S
+  S.grundriss = { mode:'none', photo:null, photoRotation:0, showGrid:false, walls:[], doors:[], windows:[] };
+  S.bereiche = []; S.pins = []; S.projekt = { bauvorhaben:'', auftraggeber:'', kvNummer:'' }; S.grundrissImg = null;
+  S.aktiveMA = 'sa'; S.step = 1; S.tool = null; S.wip = null;
+  hideConfirmOverlay();
+  showDashboard();
+}
+
+function showApp() {
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('fab-new').classList.remove('visible');
+  document.getElementById('app').style.display = 'flex';
+  const isS1 = S.step===1, isS5 = S.step===5, isCanvas = S.step>=2 && S.step<=4;
+  document.getElementById('canvas-wrap').style.display = isCanvas ? '' : 'none';
+  document.getElementById('step4-wrap').style.display  = isS1 ? 'flex' : 'none';
+  document.getElementById('step5-wrap').style.display  = isS5 ? 'flex' : 'none';
+  setTimeout(() => {
+    if (isS1) { renderStep4(); updateStepHeader(); updateToolbar(); }
+    else if (isS5) { renderStep5(); updateStepHeader(); updateToolbar(); }
+    else {
+      stage.width(container.clientWidth);
+      stage.height(container.clientHeight);
+      fitScreen(); renderAll(); updateToolbar(); updateStepHeader(); defaultHint();
+    }
+  }, 50);
+}
+
+function showDashboard() {
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'flex';
+  document.getElementById('fab-new').classList.add('visible');
+  document.getElementById('nav-bar').classList.remove('visible');
+  renderDashboard();
+}
+
+function renderDashboard() {
+  const list  = document.getElementById('db-job-list');
+  const empty = document.getElementById('db-empty');
+  if (_jobs.length === 0) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  list.innerHTML = _jobs.map(j => {
+    const saved = (j.savedThrough >= 4);
+    const stClass = saved ? 'saved' : 'draft';
+    const stLabel = saved ? '✓ Gespeichert' : '○ Entwurf';
+    const stHint  = saved ? '→ Projektdetails' : '→ Projektdaten';
+    const d = j.data || {};
+    const maStatus = d.maStatus || {};
+    const maDates  = d.maDates  || {};
+    const MA_LABELS = { sa:'SA', ab:'Aufbau', zm1:'ZM1', zm2:'ZM2', end:'Abbau' };
+    const doneChips = Object.keys(MA_LABELS)
+      .filter(id => maStatus[id] === 'done')
+      .map(id => {
+        const ts = maDates[id] || '';
+        // Kurzdatum: nur TT.MM. HH:MM
+        const short = ts.replace(/(\d{2}\.\d{2})\.\d{4},?\s*/, '$1 ');
+        return `<span class="db-ma-chip">${MA_LABELS[id]}${short ? `<span>${short}</span>` : ''}</span>`;
+      }).join('');
+    return `
+    <div class="db-card ${stClass}" data-open="${j.id}">
+      <div class="db-card-info">
+        <div class="db-card-title">${escHtml(j.bauvorhaben)||'–'}</div>
+        <div class="db-card-meta">${[escHtml(j.auftraggeber), j.kvNummer ? 'KV '+escHtml(j.kvNummer) : ''].filter(Boolean).join(' · ')||'–'}</div>
+        <div class="db-status-hint ${stClass}">${stLabel} <span style="color:#4b5563;font-weight:400">${stHint}</span></div>
+        ${doneChips ? `<div class="db-ma-list">${doneChips}</div>` : ''}
+      </div>
+      <button class="db-del" data-del="${j.id}" title="Löschen">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Dashboard events ──
+
+document.getElementById('db-job-list').addEventListener('click', e => {
+  const delBtn = e.target.closest('[data-del]');
+  if (delBtn) {
+    e.stopPropagation();
+    const jobId = delBtn.dataset.del;
+    _jobs = _jobs.filter(j => j.id !== jobId);
+    saveJobs();
+    renderDashboard();
+    return;
+  }
+  const card = e.target.closest('[data-open]');
+  if (card) openJob(card.dataset.open);
+});
+
+document.getElementById('fab-new').addEventListener('click', () => {
+  const job = {
+    id: uid(),
+    bauvorhaben: '',
+    auftraggeber: '',
+    kvNummer: '',
+    status: 'offen',
+    savedThrough: 0,
+    data: null,
+  };
+  _jobs.unshift(job);
+  saveJobs();
+  openJob(job.id);
+});
+
+document.getElementById('nj-cancel').addEventListener('click', () => {
+  document.getElementById('modal-new-job').classList.remove('show');
+});
+
+document.getElementById('nj-ok').addEventListener('click', () => {
+  const bv = document.getElementById('nj-bauvorhaben').value.trim();
+  if (!bv) { document.getElementById('nj-bauvorhaben').focus(); return; }
+  const job = {
+    id: uid(),
+    bauvorhaben:  bv,
+    auftraggeber: document.getElementById('nj-auftraggeber').value.trim(),
+    kvNummer:     document.getElementById('nj-kvnummer').value.trim(),
+    status: 'offen',
+    savedThrough: 0,
+    data: null,
+  };
+  _jobs.unshift(job);
+  saveJobs();
+  document.getElementById('modal-new-job').classList.remove('show');
+  openJob(job.id);
+});
+
+document.getElementById('btn-home').addEventListener('click', backToDashboard);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PERSISTENZ
+// ═══════════════════════════════════════════════════════════════════════════
+function save(){
+  saveCurrentJob();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════
+loadSettings();
+updateAllDataLists();
+loadJobs();
+showDashboard();
+</script>
+</body>
+</html>
