@@ -336,7 +336,7 @@
     /* Pin-Karte in Overlay */
     .ma-pin-card {
       background: #1f2937; border-radius: 12px; padding: 16px;
-      margin-bottom: 16px; border: 1.5px solid #374151;
+      margin-bottom: 16px; border: 1.5px solid #374151; overflow: hidden;
     }
     .ma-pin-nr {
       font-size: 11px; font-weight: 700; color: #6b7280;
@@ -347,12 +347,14 @@
     .ma-pin-bereich { font-size: 13px; color: #9ca3af; }
     .ma-digits-row {
       display: flex; align-items: center; gap: 10px; margin-top: 14px;
+      width: 100%;
     }
     .ma-digits-input {
-      flex: 1; padding: 14px 14px; border: 2px solid #374151;
+      flex: 1 1 0; min-width: 0; width: 0;
+      padding: 14px 10px; border: 2px solid #374151;
       border-radius: 10px; background: #111827; color: #f9fafb;
       font-size: 28px; font-weight: 700; text-align: center;
-      outline: none; font-family: inherit;
+      outline: none; font-family: inherit; box-sizing: border-box;
     }
     .ma-digits-input:focus { border-color: #3b82f6; }
     .ma-digits-unit {
@@ -1482,9 +1484,9 @@ function renderPins() {
     const fillColor = inStep4 ? (filled ? '#10b981' : '#6b7280') : '#ef4444';
     const g = new Konva.Group({x:pin.x,y:pin.y,draggable:S.step===4,id:pin.id});
     g.add(new Konva.Circle({radius:10,fill:fillColor,stroke:'#fff',strokeWidth:2}));
-    const room = S.bereiche.find(b=>b.id===pin.bereichId);
-    const roomLabel = room ? (room.bereichName||room.name||'') : '';
-    g.add(new Konva.Text({text:pin.label+(roomLabel?'\n'+roomLabel:''),fontSize:11,fill:'#fff',fontStyle:'bold',align:'center',width:60,offsetX:30,offsetY:-20}));
+    // Label-Chip: weißer Hintergrund, schwarzer Text, über dem Pin-Kreis
+    g.add(new Konva.Rect({x:-16,y:-32,width:32,height:16,fill:'#ffffff',cornerRadius:3,stroke:'#9ca3af',strokeWidth:.7,listening:false}));
+    g.add(new Konva.Text({x:-16,y:-31,text:pin.label,fontSize:11,fill:'#111111',fontStyle:'bold',align:'center',width:32,listening:false}));
     g.on('dragend',()=>{ pin.x=g.x();pin.y=g.y();detectPinRoom(pin);renderPins();save(); });
     pinLayer.add(g);
   }
@@ -2591,14 +2593,31 @@ function captureGrundrissExport() {
     const fontSize = Math.max(11, Math.round(13 * sc));
     ctx.font = `bold ${fontSize}px Arial`;
     ctx.textAlign = 'center';
+    // Pin-Label-Chips: weißer Hintergrund, schwarzer Text (analog Canvas-Darstellung)
     S.pins.forEach(p => {
-      const sx = p.x * sc + px;
-      const sy = (p.y + 20) * sc + py;  // 20px unterhalb des Pin-Kreises
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 3;
-      ctx.strokeText(p.label, sx, sy);
+      const cx = p.x * sc + px;
+      const cy = p.y * sc + py;
+      const chipW = 32 * sc, chipH = 16 * sc;
+      const chipX = cx - chipW / 2;
+      const chipY = cy - (32 * sc);  // über dem Kreis
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#9ca3af';
+      ctx.lineWidth = 0.7 * sc;
+      const r = 3 * sc;
+      ctx.beginPath();
+      ctx.moveTo(chipX + r, chipY);
+      ctx.lineTo(chipX + chipW - r, chipY);
+      ctx.quadraticCurveTo(chipX + chipW, chipY, chipX + chipW, chipY + r);
+      ctx.lineTo(chipX + chipW, chipY + chipH - r);
+      ctx.quadraticCurveTo(chipX + chipW, chipY + chipH, chipX + chipW - r, chipY + chipH);
+      ctx.lineTo(chipX + r, chipY + chipH);
+      ctx.quadraticCurveTo(chipX, chipY + chipH, chipX, chipY + chipH - r);
+      ctx.lineTo(chipX, chipY + r);
+      ctx.quadraticCurveTo(chipX, chipY, chipX + r, chipY);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
       ctx.fillStyle = '#111111';
-      ctx.fillText(p.label, sx, sy);
+      ctx.fillText(p.label, cx, chipY + chipH * 0.75);
     });
 
     const dataUrl = out.toDataURL('image/jpeg', 0.85);
