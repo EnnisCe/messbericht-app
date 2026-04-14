@@ -316,7 +316,7 @@
       letter-spacing: .5px; color: #6b7280; margin-bottom: 12px;
     }
     .ma-field { margin-bottom: 14px; }
-    .ma-field select, .ma-field input { width: 100%; box-sizing: border-box; }
+    .ma-field select, .ma-field input { width: 100%; min-width: 0; box-sizing: border-box; }
     .ma-field label {
       display: block; font-size: 11px; font-weight: 600;
       color: #9ca3af; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .3px;
@@ -377,20 +377,20 @@
       font-size: 13px; font-weight: 700; color: #e5e7eb; margin-bottom: 12px;
     }
     .ma-klima-row {
-      display: flex; gap: 10px;
+      display: flex; gap: 10px; width: 100%;
     }
     .ma-klima-field {
-      flex: 1; display: flex; flex-direction: column; gap: 4px;
+      flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 4px;
     }
     .ma-klima-field label {
       font-size: 10px; font-weight: 600; color: #6b7280;
       text-transform: uppercase; letter-spacing: .3px;
     }
     .ma-klima-input-wrap {
-      display: flex; align-items: center; gap: 6px;
+      display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0;
     }
     .ma-klima-input {
-      flex: 1; padding: 9px 10px; border-radius: 8px;
+      flex: 1 1 0; min-width: 0; width: 0; padding: 9px 10px; border-radius: 8px;
       border: 1.5px solid #374151; background: #111827;
       color: #f9fafb; font-size: 15px; font-weight: 600;
       outline: none; font-family: inherit; text-align: center;
@@ -454,8 +454,8 @@
     #ma-btn-back:disabled { opacity: .35; pointer-events: none; }
 
     /* ── Gear button neben Dropdowns ── */
-    .select-gear-wrap { display: flex; align-items: center; gap: 6px; }
-    .select-gear-wrap select { flex: 1; min-width: 0; }
+    .select-gear-wrap { display: flex; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+    .select-gear-wrap select { flex: 1 1 0; min-width: 0; width: 0; }
     .gear-btn {
       width: 38px; height: 38px; flex-shrink: 0; border-radius: 8px;
       border: 1.5px solid #374151; background: #111827; color: #9ca3af;
@@ -1051,7 +1051,7 @@ let S = {
   maDates:  { sa:null, ab:null, zm1:null, zm2:null, end:null },
   maInfo:   { sa:{datum:'',name:'',messgeraet:''}, ab:{datum:'',name:'',messgeraet:''}, zm1:{datum:'',name:'',messgeraet:''}, zm2:{datum:'',name:'',messgeraet:''}, end:{datum:'',name:'',messgeraet:''} },
   grundriss: {
-    mode: 'none', photo: null, photoRotation: 0, showGrid: false,
+    mode: 'none', photo: null, photoRotation: 0, showGrid: true,
     walls: [], doors: [], windows: [],
   },
   bereiche: [],
@@ -1344,8 +1344,8 @@ function renderBg() {
     img.src = S.grundriss.photo.dataUrl;
   } else if (S.grundriss.mode === 'drawing') {
     if (S.grundriss.showGrid) {
-      for (let x=0;x<=W;x+=50) bgLayer.add(new Konva.Line({points:[x,0,x,H],stroke:'#e5e7eb',strokeWidth:.5,listening:false}));
-      for (let y=0;y<=H;y+=50) bgLayer.add(new Konva.Line({points:[0,y,W,y],stroke:'#e5e7eb',strokeWidth:.5,listening:false}));
+      for (let x=0;x<=W;x+=50) bgLayer.add(new Konva.Line({points:[x,0,x,H],stroke:'#9ca3af',strokeWidth:.7,listening:false}));
+      for (let y=0;y<=H;y+=50) bgLayer.add(new Konva.Line({points:[0,y,W,y],stroke:'#9ca3af',strokeWidth:.7,listening:false}));
     }
     bgLayer.add(new Konva.Rect({x:0,y:0,width:W,height:H,stroke:'#d1d5db',strokeWidth:1,listening:false}));
   } else {
@@ -1920,7 +1920,7 @@ function updateToolbar() {
 const FIT_ICON = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 2,2 6,2"/><polyline points="12,2 16,2 16,6"/><polyline points="16,12 16,16 12,16"/><polyline points="6,16 2,16 2,12"/></svg>`;
 
 function fitBtn() {
-  return {id:'_fit', icon:FIT_ICON, label:'Einpassen', hint:'Grundriss zentrieren und einpassen',
+  return {id:'_fit', icon:FIT_ICON, label:'Zoom to fit', hint:'Grundriss zentrieren und einpassen',
     action:()=>{ fitScreen(); renderAll(); }};
 }
 
@@ -2046,7 +2046,7 @@ function toggleGrid()  { S.grundriss.showGrid=!S.grundriss.showGrid; renderBg();
 function switchMode(to) {
   if(S.grundriss.mode===to)return;
   showWarnModal('Grundrisstyp wechseln?\nBereiche und Messpunkte bleiben erhalten.',()=>{
-    S.grundriss={mode:to,photo:null,photoRotation:0,showGrid:false,walls:[],doors:[],windows:[]};
+    S.grundriss={mode:to,photo:null,photoRotation:0,showGrid:true,walls:[],doors:[],windows:[]};
     S.selectedWallId=null;S.selectedElement=null;S.wip=null;S.tool=null;
     hideConfirmOverlay();
     if(to==='photo')doPhotoUpload();
