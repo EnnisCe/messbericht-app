@@ -3218,10 +3218,102 @@ function loadJobs() {
         _jobs = [{ id: uid(), bauvorhaben: d.proj.bauvorhaben,
           auftraggeber: d.proj.auftraggeber||'', kvNummer: d.proj.kvNummer||'',
           status: 'aktiv', data: { g: d.g, b: d.b, p: d.p, ma: d.ma } }];
-        saveJobs();
+        saveJobs(); return;
       }
     }
+    // Kein gespeichertes Projekt → Demo-Projekt laden
+    _jobs = [_buildDemoJob()];
+    saveJobs();
   } catch(_) {}
+}
+
+function _buildDemoJob() {
+  const mid = k => 'demo_' + k;
+  // ── Wände (einfacher 2-Zimmer-Grundriss) ──
+  const walls = [
+    {id:mid('w1'), x1:100, y1:150, x2:900, y2:150, type:'wall_outer'},
+    {id:mid('w2'), x1:900, y1:150, x2:900, y2:750, type:'wall_outer'},
+    {id:mid('w3'), x1:900, y1:750, x2:100, y2:750, type:'wall_outer'},
+    {id:mid('w4'), x1:100, y1:750, x2:100, y2:150, type:'wall_outer'},
+    {id:mid('w5'), x1:530, y1:150, x2:530, y2:750, type:'wall_inner'},
+  ];
+  const doors = [
+    {id:mid('d1'), wallId:mid('w4'), t:0.55, w:90,  variant:0},
+    {id:mid('d2'), wallId:mid('w5'), t:0.45, w:75,  variant:2},
+  ];
+  const windows = [
+    {id:mid('win1'), wallId:mid('w1'), t:0.28, w:120, variant:0},
+    {id:mid('win2'), wallId:mid('w1'), t:0.78, w:100, variant:0},
+    {id:mid('win3'), wallId:mid('w2'), t:0.5,  w:90,  variant:0},
+  ];
+  // ── Bereiche ──
+  const b1id = mid('b1'), b2id = mid('b2');
+  const bereiche = [
+    {
+      id: b1id, raum: 'Wohnzimmer', bereichName: 'Außenwand Nord',
+      pts: [{x:108,y:158},{x:522,y:158},{x:522,y:742},{x:108,y:742}],
+      messungen: {
+        sa:  {temp:20.5, rh:58}, ab: {temp:21.0, rh:55},
+        zm1: {temp:21.5, rh:52}, zm2:{temp:null,rh:null}, end:{temp:null,rh:null},
+      },
+    },
+    {
+      id: b2id, raum: 'Badezimmer', bereichName: 'Außenwand West',
+      pts: [{x:538,y:158},{x:892,y:158},{x:892,y:742},{x:538,y:742}],
+      messungen: {
+        sa:  {temp:22.0, rh:65}, ab: {temp:22.5, rh:63},
+        zm1: {temp:23.0, rh:59}, zm2:{temp:null,rh:null}, end:{temp:null,rh:null},
+      },
+    },
+  ];
+  // ── Messpunkte ──
+  const pins = [
+    {
+      id:mid('p1'), x:220, y:350, label:'1', bereichId:b1id, verfahren:'WI', material:'Estrich',
+      messungen: { sa:{digits:45}, ab:{digits:41}, zm1:{digits:32}, zm2:{digits:null}, end:{digits:null} },
+    },
+    {
+      id:mid('p2'), x:380, y:560, label:'2', bereichId:b1id, verfahren:'WI', material:'Estrich',
+      messungen: { sa:{digits:52}, ab:{digits:48}, zm1:{digits:38}, zm2:{digits:null}, end:{digits:null} },
+    },
+    {
+      id:mid('p3'), x:650, y:320, label:'3', bereichId:b2id, verfahren:'WI', material:'Estrich',
+      messungen: { sa:{digits:38}, ab:{digits:35}, zm1:{digits:28}, zm2:{digits:null}, end:{digits:null} },
+    },
+    {
+      id:mid('p4'), x:800, y:580, label:'4', bereichId:b2id, verfahren:'KA', material:'Mauerwerk',
+      messungen: { sa:{digits:67}, ab:{digits:61}, zm1:{digits:45}, zm2:{digits:null}, end:{digits:null} },
+    },
+  ];
+  const maInfo = {
+    sa:  {datum:'2026-03-15', name:'Max Mustermann', messgeraet:'Gann Hydromette RTU 600',
+          trocken:{wahl:'notwendig', extraVal:'', bemerkungen:'Starke Durchfeuchtung im Badbereich festgestellt.'}},
+    ab:  {datum:'2026-03-20', name:'Max Mustermann', messgeraet:'Gann Hydromette RTU 600'},
+    zm1: {datum:'2026-04-01', name:'Lisa Müller',    messgeraet:'Gann Hydromette RTU 600'},
+    zm2: {datum:'', name:'', messgeraet:''},
+    end: {datum:'', name:'', messgeraet:''},
+  };
+  return {
+    id: mid('job'),
+    bauvorhaben:  'Brühlstraße 7, Konstanz',
+    auftraggeber: 'Muster Hausverwaltung GmbH',
+    kvNummer:     '189565',
+    status: 'aktiv',
+    savedThrough: 4,
+    data: {
+      tech: 'Max Mustermann',
+      datum: '2026-03-15',
+      savedThrough: 4,
+      g: { mode:'drawing', photo:null, photoRotation:0, showGrid:true, walls, doors, windows },
+      b: bereiche,
+      p: pins,
+      ma: 'sa',
+      maStatus: { sa:'done', ab:'done', zm1:'done', zm2:'pending', end:'pending' },
+      maDates:  { sa:'2026-03-15', ab:'2026-03-20', zm1:'2026-04-01', zm2:null, end:null },
+      maInfo,
+      grundrissImg: null,
+    },
+  };
 }
 
 function saveCurrentJob() {
