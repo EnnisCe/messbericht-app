@@ -80,8 +80,14 @@
     #topbar-wrap { position: relative; flex-shrink: 0; }
     #topbar-wrap::after {
       content:""; pointer-events:none; position:absolute; right:0; top:0; bottom:0; width:40px;
-      background: linear-gradient(to right, transparent, #1f2937);
+      background: linear-gradient(to right, transparent, #1f2937); z-index: 1;
     }
+    #topbar-wrap::before {
+      content:""; pointer-events:none; position:absolute; left:0; top:0; bottom:0; width:40px;
+      background: linear-gradient(to left, transparent, #1f2937); z-index: 1;
+      opacity: 0; transition: opacity .2s;
+    }
+    #topbar-wrap.scrolled-left::before { opacity: 1; }
     #topbar {
       background: #1f2937; border-bottom: 1px solid #374151;
       padding: 8px 10px; overflow-x: auto; -webkit-overflow-scrolling: touch;
@@ -302,7 +308,7 @@
     }
     #ma-overlay { max-width: 100vw; overflow-x: hidden; }
     #ma-ov-body {
-      flex: 1; overflow-y: auto; padding: 18px 16px 24px;
+      flex: 1; overflow-y: auto; overflow-x: hidden; padding: 18px 16px 24px;
       -webkit-overflow-scrolling: touch;
     }
     .ma-section-title {
@@ -365,7 +371,7 @@
     /* ── Bereiche Raumklima Screen ── */
     .ma-bereich-card {
       background: #1f2937; border: 1.5px solid #374151; border-radius: 12px;
-      padding: 14px 16px; margin-bottom: 10px;
+      padding: 14px 16px; margin-bottom: 10px; overflow: hidden;
     }
     .ma-bereich-card-title {
       font-size: 13px; font-weight: 700; color: #e5e7eb; margin-bottom: 12px;
@@ -1897,7 +1903,7 @@ function updateToolbar() {
     const isActive = S.tool === t.id && !!t.id;
     const btn = document.createElement('button');
     btn.className = 'tool-btn'+(isActive?' active':'')+(isActive&&t.del?' del':'')+(t.cls&&!isActive?' '+t.cls:'')+(t.dim?' dim':'');
-    btn.innerHTML = `<span class="icon">${t.icon}</span><span>${t.label}</span>`;
+    btn.innerHTML = `<span class="icon">${t.icon}</span>${t.label ? `<span>${t.label}</span>` : ''}`;
     btn.ontouchstart = ()=>{};
     btn.onclick = ()=>{
       if(t.action){t.action();return;}
@@ -1911,19 +1917,20 @@ function updateToolbar() {
   }
 }
 
+const FIT_ICON = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="2,6 2,2 6,2"/><polyline points="12,2 16,2 16,6"/><polyline points="16,12 16,16 12,16"/><polyline points="6,16 2,16 2,12"/></svg>`;
+
 function fitBtn() {
-  return {id:'_fit', icon:'⊡', label:'Einpassen', hint:'Grundriss zentrieren und einpassen',
+  return {id:'_fit', icon:FIT_ICON, label:'Einpassen', hint:'Grundriss zentrieren und einpassen',
     action:()=>{ fitScreen(); renderAll(); }};
 }
 
 function toolDefs() {
-  const undo  ={id:'_undo',  icon:'↩',label:'Rückgängig',dim:!_history.length, hint:'',action:undoLast};
-  const redo  ={id:'_redo',  icon:'↪',label:'Wiederholen',dim:!_redoStack.length,hint:'',action:redoLast};
-  const pan   ={id:'pan',    icon:'✋',label:'Bewegen',    hint:'Einen Finger ziehen zum Verschieben'};
+  const undo  ={id:'_undo',  icon:'↩',label:'',dim:!_history.length, hint:'',action:undoLast};
+  const redo  ={id:'_redo',  icon:'↪',label:'',dim:!_redoStack.length,hint:'',action:redoLast};
   const eraser={id:'eraser', icon:'🗑',label:'Löschen',   hint:'Element antippen zum Löschen',del:true};
 
   if (S.step===2) {
-    const tools=[undo,redo,pan,fitBtn()];
+    const tools=[undo,redo,fitBtn()];
     if (S.selectedElement) {
       const lbl=S.selectedElement.type==='door'?'Tür':'Fenster';
       tools.push(
@@ -1968,17 +1975,17 @@ function toolDefs() {
     return tools;
   }
   if (S.step===3) {
-    const tools=[undo,redo,pan,fitBtn(),{id:'bereich',icon:'⬡',label:'Bereich',hint:'Punkt für Punkt tippen · auf ersten Punkt tippen zum Schließen'}];
+    const tools=[undo,redo,fitBtn(),{id:'bereich',icon:'⬡',label:'Bereich',hint:'Punkt für Punkt tippen · auf ersten Punkt tippen zum Schließen'}];
     if(S.wip?.type==='bereich'&&S.wip.pts?.length>=3)
       tools.push({id:'_close',icon:'✅',label:'Schließen',hint:'Polygon schließen',cls:'accent',action:finishBereich});
     tools.push(eraser);
     return tools;
   }
-  if (S.step===4) return [undo,redo,pan,fitBtn(),
+  if (S.step===4) return [undo,redo,fitBtn(),
     {id:'pin',icon:'📍',label:'Pin',hint:'Tippen zum Platzieren · ✓ zum Bestätigen'},
     eraser,
   ];
-  return [undo,pan];
+  return [undo,redo];
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2831,91 +2838,166 @@ function generateHtmlDownload() {
 // ─── Excel Export ───────────────────────────────────────────────────────────
 function generateExcel() {
   saveCurrentJob();
-  if (!window.XLSX) { toast('XLSX-Bibliothek nicht geladen'); return; }
+  if (!S.grundrissImg) S.grundrissImg = captureGrundrissExport();
 
   const proj = S.projekt;
-  const wb = XLSX.utils.book_new();
+  const visibleMas = MA_SEQUENCE.filter(ma => S.maStatus[ma.id] === 'done' || S.maStatus[ma.id] === 'pending');
 
-  // ── Blatt 1: Projektübersicht ──
-  const infoRows = [
-    ['Bauvorhaben', proj.bauvorhaben || ''],
-    ['Auftraggeber', proj.auftraggeber || ''],
-    ['KV-Nummer', proj.kvNummer || ''],
-    ['Techniker', proj.techniker || ''],
-    ['Datum', proj.datum || ''],
-  ];
-  const wsInfo = XLSX.utils.aoa_to_sheet(infoRows);
-  wsInfo['!cols'] = [{wch:16},{wch:40}];
-  XLSX.utils.book_append_sheet(wb, wsInfo, 'Projekt');
+  function esc(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function cell(val, style) {
+    return style ? `<td style="${style}">${esc(val)}</td>` : `<td>${esc(val)}</td>`;
+  }
+  const TH = (s, colspan) => `<th${colspan?` colspan="${colspan}"`:''}>${esc(s)}</th>`;
 
-  // ── Blatt 2: Messdaten (Pins) ──
-  const header = ['Messaufnahme','Messpunkt','Feuchte %','Verfahren','Material','Bereich','Raum','Datum','Techniker','Messgerät'];
-  const rows = [header];
+  // ── Projektdaten ───────────────────────────────────────
+  const hdr = `
+    <tr style="background:#cc0000;color:#fff;font-size:12pt">
+      <td colspan="20"><b>Messbericht – ${esc(proj.bauvorhaben)}</b></td></tr>
+    <tr><td style="font-weight:bold">Bauvorhaben</td><td colspan="5">${esc(proj.bauvorhaben)}</td><td style="font-weight:bold">Datum</td><td>${esc(proj.datum)}</td></tr>
+    <tr><td style="font-weight:bold">Auftraggeber</td><td colspan="5">${esc(proj.auftraggeber)}</td><td style="font-weight:bold">Techniker</td><td>${esc(proj.techniker)}</td></tr>
+    <tr>${cell('KV-Nummer','font-weight:bold')}${cell(proj.kvNummer)}</tr>
+    <tr><td colspan="20"></td></tr>`;
 
-  MA_SEQUENCE.forEach(seq => {
-    if (S.maStatus[seq.id] !== 'done' && S.maStatus[seq.id] !== 'pending') return;
-    const maLabel = seq.label;
-    const info = S.maInfo?.[seq.id] || {};
+  // ── Grundriss ──────────────────────────────────────────
+  const grundrissRows = S.grundrissImg
+    ? `<tr><td colspan="20" style="font-weight:bold;font-size:10pt;background:#f0f0f0">Grundriss</td></tr>
+       <tr><td colspan="20" style="text-align:center;padding:8px">
+         <img src="${S.grundrissImg}" style="max-width:680px;max-height:480px">
+       </td></tr>
+       <tr><td colspan="20"></td></tr>`
+    : '';
 
-    // Pin-Messungen
-    S.pins.forEach(pin => {
-      const m = pin.messungen?.[seq.id];
-      const digits = m?.digits;
-      if (digits === null && digits === undefined) return;
+  // ── Messtabelle ────────────────────────────────────────
+  let mesRows = `<tr><td colspan="20" style="font-weight:bold;font-size:10pt;background:#f0f0f0">Messwerte</td></tr>`;
+  if (visibleMas.length && S.pins.length) {
+    let thead = `<tr style="background:#e8e8e8">
+      ${TH('MP')}${TH('Verfahren')}${TH('Material')}${TH('Bereich')}${TH('Raum')}`;
+    visibleMas.forEach(ma => { thead += TH(ma.label); });
+    thead += '</tr>';
+
+    let tr_datum = '<tr style="background:#f4f4f4">' + '<td colspan="5"></td>';
+    let tr_name  = '<tr style="background:#f4f4f4">' + '<td colspan="5"></td>';
+    let tr_mg    = '<tr style="background:#f4f4f4">' + '<td colspan="5"></td>';
+    visibleMas.forEach(ma => {
+      const info = S.maInfo?.[ma.id] || {};
+      tr_datum += `<td style="font-size:7pt;color:#666">${esc(info.datum||'')}</td>`;
+      tr_name  += `<td style="font-size:7pt;color:#666">${esc(info.name||'')}</td>`;
+      tr_mg    += `<td style="font-size:7pt;color:#666">${esc(info.messgeraet||'')}</td>`;
+    });
+    tr_datum += '</tr>'; tr_name += '</tr>'; tr_mg += '</tr>';
+
+    let tbody = '';
+    S.pins.forEach((pin, idx) => {
       const b = S.bereiche.find(b => b.id === pin.bereichId);
-      rows.push([
-        maLabel,
-        pin.label || '',
-        digits !== null && digits !== undefined ? digits : '',
-        pin.verfahren || '',
-        pin.material  || '',
-        b ? (b.bereichName || '') : '',
-        b ? (b.raum || '') : '',
-        info.datum || '',
-        info.name  || '',
-        info.messgeraet || '',
-      ]);
+      let row = `<tr${idx%2?' style="background:#fafafa"':''}>
+        <td style="text-align:center">${esc(pin.label)}</td>
+        <td>${esc(pin.verfahren||'')}</td>
+        <td>${esc(pin.material||'')}</td>
+        <td>${esc(b?b.bereichName||'':'')}  </td>
+        <td>${esc(b?b.raum||'':'')}</td>`;
+      visibleMas.forEach(ma => {
+        const d = pin.messungen?.[ma.id]?.digits;
+        row += `<td style="text-align:center">${d!==null&&d!==undefined?esc(d):'–'}</td>`;
+      });
+      row += '</tr>';
+      tbody += row;
     });
-  });
-
-  // ── Blatt 3: Raumklima ──
-  const climHeader = ['Messaufnahme','Raum','Bereich','Temp °C','LF %','Datum','Techniker','Messgerät'];
-  const climRows = [climHeader];
-
-  MA_SEQUENCE.forEach(seq => {
-    if (S.maStatus[seq.id] !== 'done' && S.maStatus[seq.id] !== 'pending') return;
-    const maLabel = seq.label;
-    const info = S.maInfo?.[seq.id] || {};
-
-    S.bereiche.forEach(b => {
-      const m = b.messungen?.[seq.id];
-      if (!m) return;
-      climRows.push([
-        maLabel,
-        b.raum       || '',
-        b.bereichName|| '',
-        m.temp !== null && m.temp !== undefined ? m.temp : '',
-        m.rh   !== null && m.rh   !== undefined ? m.rh   : '',
-        info.datum || '',
-        info.name  || '',
-        info.messgeraet || '',
-      ]);
-    });
-  });
-
-  if (rows.length === 1) rows.push(['Keine Pin-Messdaten vorhanden']);
-  const wsData = XLSX.utils.aoa_to_sheet(rows);
-  wsData['!cols'] = [{wch:18},{wch:12},{wch:10},{wch:12},{wch:14},{wch:20},{wch:16},{wch:12},{wch:16},{wch:22}];
-  XLSX.utils.book_append_sheet(wb, wsData, 'Messpunkte');
-
-  if (climRows.length > 1) {
-    const wsClim = XLSX.utils.aoa_to_sheet(climRows);
-    wsClim['!cols'] = [{wch:18},{wch:16},{wch:20},{wch:9},{wch:7},{wch:12},{wch:16},{wch:22}];
-    XLSX.utils.book_append_sheet(wb, wsClim, 'Raumklima');
+    mesRows += `<table style="border-collapse:collapse;width:100%;font-size:8.5pt">
+      <thead>${thead}${tr_datum}${tr_name}${tr_mg}</thead>
+      <tbody>${tbody}</tbody>
+    </table>`;
+  } else {
+    mesRows += '<tr><td colspan="20" style="color:#888">Keine Messpunkte vorhanden</td></tr>';
   }
 
+  // ── Raumklima ──────────────────────────────────────────
+  let klimaRows = '';
+  if (visibleMas.length && S.bereiche.length) {
+    klimaRows = `<tr><td colspan="20"></td></tr>
+      <tr><td colspan="20" style="font-weight:bold;font-size:10pt;background:#f0f0f0">Raumklima</td></tr>`;
+    let thead = `<tr style="background:#e8e8e8">${TH('Raum')}${TH('Bereich')}`;
+    visibleMas.forEach(ma => { thead += `<th colspan="2">${esc(ma.label)}</th>`; });
+    thead += '</tr><tr style="background:#f4f4f4"><td></td><td></td>';
+    visibleMas.forEach(() => { thead += '<th>°C</th><th>%</th>'; });
+    thead += '</tr>';
+
+    let tbody = '';
+    S.bereiche.forEach((b, idx) => {
+      let row = `<tr${idx%2?' style="background:#fafafa"':''}>
+        <td>${esc(b.raum||'')}</td><td>${esc(b.bereichName||'')}</td>`;
+      visibleMas.forEach(ma => {
+        const m = b.messungen?.[ma.id] || {};
+        row += `<td style="text-align:center">${m.temp!==null&&m.temp!==undefined?m.temp:'–'}</td>`;
+        row += `<td style="text-align:center">${m.rh!==null&&m.rh!==undefined?m.rh:'–'}</td>`;
+      });
+      row += '</tr>';
+      tbody += row;
+    });
+    klimaRows += `<table style="border-collapse:collapse;width:100%;font-size:8.5pt">
+      <thead>${thead}</thead><tbody>${tbody}</tbody>
+    </table>`;
+  }
+
+  // ── Trocknung ──────────────────────────────────────────
+  const tr = S.maInfo?.sa?.trocken || {};
+  const trockenLabels = {
+    notwendig:      'Trocknung notwendig',
+    nicht_notwendig:'Trocknung nicht notwendig',
+    erfolgreich:    'Trocknung erfolgreich abgeschlossen am',
+    abgebrochen:    'Trocknung abgebrochen weil',
+  };
+  let trockenRows = `<tr><td colspan="20"></td></tr>
+    <tr><td colspan="20" style="font-weight:bold;font-size:10pt;background:#f0f0f0">Trocknung</td></tr>`;
+  Object.entries(trockenLabels).forEach(([val, label]) => {
+    const checked = tr.wahl === val;
+    let extra = '';
+    if (checked && tr.extraVal) extra = ' ' + tr.extraVal;
+    trockenRows += `<tr><td style="text-align:center;width:24px">${checked?'☑':'☐'}</td>
+      <td colspan="19">${esc(label)}${extra?`<b> ${esc(extra)}</b>`:''}</td></tr>`;
+  });
+  if (tr.bemerkungen) {
+    trockenRows += `<tr><td></td><td colspan="19"><b>Bemerkungen:</b> ${esc(tr.bemerkungen)}</td></tr>`;
+  }
+
+  // ── HTML/XLS Dokument ──────────────────────────────────
+  const xlsHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office"
+     xmlns:x="urn:schemas-microsoft-com:office:excel"
+     xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="UTF-8">
+  <!--[if gte mso 9]><xml>
+   <x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet>
+    <x:Name>Messbericht</x:Name>
+    <x:WorksheetOptions><x:Selected/></x:WorksheetOptions>
+   </x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook>
+  </xml><![endif]-->
+  <style>
+    table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; }
+    td, th { border: 0.5pt solid #ccc; padding: 3px 6px; vertical-align: top; }
+    th { background: #e8e8e8; font-weight: bold; }
+  </style>
+</head>
+<body>
+<table>
+  ${hdr}
+  ${grundrissRows}
+  <tr><td colspan="20">${mesRows}</td></tr>
+  ${klimaRows ? `<tr><td colspan="20">${klimaRows}</td></tr>` : ''}
+  ${trockenRows}
+</table>
+</body>
+</html>`;
+
+  const blob = new Blob([xlsHtml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
   const fname = (proj.bauvorhaben || 'Messbericht').replace(/[^a-zA-Z0-9äöüÄÖÜß _-]/g, '_');
-  XLSX.writeFile(wb, fname + '.xlsx');
+  a.href = url; a.download = fname + '.xls';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3347,6 +3429,17 @@ loadSettings();
 updateAllDataLists();
 loadJobs();
 showDashboard();
+
+// Linker Scroll-Indikator in Topbar
+(function() {
+  const tb = document.getElementById('topbar');
+  const tw = document.getElementById('topbar-wrap');
+  if (tb && tw) {
+    tb.addEventListener('scroll', () => {
+      tw.classList.toggle('scrolled-left', tb.scrollLeft > 4);
+    }, { passive: true });
+  }
+})();
 </script>
 </body>
 </html>
